@@ -11,23 +11,56 @@ type Evaluation = {
 
 function demoEvaluation(answer: string): Evaluation {
   const normalized = answer.toLowerCase();
-  const mentionsAlias = normalized.includes("alias") || normalized.includes("route");
-  const mentionsSol = normalized.includes("sol");
-  const mentionsExplicit = normalized.includes("explicit") || normalized.includes("clear") || normalized.includes("config");
-  const score = Math.min(96, 38 + Number(mentionsAlias) * 24 + Number(mentionsSol) * 18 + Number(mentionsExplicit) * 16);
+  const mentionsTrigger = normalized.includes("threshold") || normalized.includes("token count") || normalized.includes("context limit");
+  const mentionsPreservedState = normalized.includes("state") || normalized.includes("reasoning") || normalized.includes("context");
+  const mentionsCompactItem = normalized.includes("opaque") || normalized.includes("compact item") || normalized.includes("compaction item");
+  const mentionsNextRequest = normalized.includes("new user") || normalized.includes("new message") || normalized.includes("only the new");
+  const mentionsResponseId = normalized.includes("previous_response_id") || normalized.includes("response id");
+  const score = Math.min(
+    96,
+    28
+      + Number(mentionsTrigger) * 18
+      + Number(mentionsPreservedState) * 16
+      + Number(mentionsCompactItem) * 12
+      + Number(mentionsNextRequest) * 13
+      + Number(mentionsResponseId) * 13,
+  );
+
+  const missing: string[] = [];
+  if (!mentionsTrigger) missing.push("the configured token threshold triggers compaction");
+  if (!(mentionsPreservedState && mentionsCompactItem)) missing.push("an opaque item preserves the key prior state and reasoning");
+  if (!(mentionsNextRequest && mentionsResponseId)) missing.push("the next chained request contains only the new user message plus previous_response_id");
 
   return {
     score,
-    verdict: score >= 78 ? "Strong explanation" : score >= 60 ? "Mostly there" : "Partially correct",
+    verdict: score >= 78 ? "You have the handoff" : score >= 60 ? "One link is missing" : "Rebuild the sequence",
     feedback: score >= 78
-      ? "You connected the alias to Sol and explained why the explicit ID makes intent clearer in configuration."
-      : mentionsAlias
-        ? "You identified the routing alias. Add that gpt-5.6-sol names the tier directly and makes the selection explicit in code."
-        : "The key missing relationship is that gpt-5.6 is an alias that currently routes to gpt-5.6-sol.",
-    misconception: score >= 78 ? null : "Treating the family alias and explicit tier ID as unrelated model versions.",
-    nextPrompt: "Apply the distinction in a model configuration.",
+      ? "You connected the trigger, preserved state, and next-request behavior into one accurate sequence."
+      : `Add ${missing[0] ?? "the relationship between the compact item and the next request"}.`,
+    misconception: score >= 78 ? null : missing.join("; "),
+    nextPrompt: score >= 78 ? "Configure compaction for a long-running agent." : "Try the visual sequence, then explain the handoff again.",
     mode: "demo",
   };
+}
+
+function outputText(result: unknown): string | null {
+  if (!result || typeof result !== "object") return null;
+  const response = result as { output_text?: unknown; output?: unknown };
+  if (typeof response.output_text === "string") return response.output_text;
+  if (!Array.isArray(response.output)) return null;
+
+  for (const item of response.output) {
+    if (!item || typeof item !== "object") continue;
+    const content = (item as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const part of content) {
+      if (!part || typeof part !== "object") continue;
+      const text = (part as { text?: unknown }).text;
+      if (typeof text === "string") return text;
+    }
+  }
+
+  return null;
 }
 
 export async function POST(request: Request) {
@@ -51,7 +84,7 @@ export async function POST(request: Request) {
         input: [
           {
             role: "system",
-            content: "You are Current's concise recall evaluator. Grade only against this claim: gpt-5.6 is an alias that currently routes to gpt-5.6-sol; the explicit ID directly names the Sol tier and makes intent legible in configuration. Do not require claims beyond this rubric.",
+            content: "You are Current's concise recall evaluator. Grade only these three ideas: server-side compaction runs when rendered token count crosses the configured compact_threshold; it returns an opaque item that preserves key prior state and reasoning with fewer tokens; when chaining with previous_response_id, the next request should contain only the new user message and should not manually prune the chain. Do not require claims beyond this rubric.",
           },
           {
             role: "user",
@@ -81,9 +114,10 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) throw new Error(`OpenAI request failed: ${response.status}`);
-    const result = (await response.json()) as { output_text?: string };
-    if (!result.output_text) throw new Error("OpenAI response did not contain output_text");
-    const evaluation = JSON.parse(result.output_text) as Omit<Evaluation, "mode">;
+    const result = await response.json();
+    const text = outputText(result);
+    if (!text) throw new Error("OpenAI response did not contain output text");
+    const evaluation = JSON.parse(text) as Omit<Evaluation, "mode">;
     return NextResponse.json({ ...evaluation, mode: "live" });
   } catch (error) {
     console.error("Live evaluation failed; using deterministic fallback", error);

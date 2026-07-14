@@ -930,3 +930,19 @@ Avoid:
 Potential visual metaphor:
 
 "Codex for your brain": a calm agent workspace where learning tasks, research updates, recall prompts, and mastery changes happen in visible, inspectable threads.
+
+## Second-Pass Product Reset
+
+The first implementation missed the product thesis. It presented Current as a generic light-mode SaaS dashboard with synthetic metrics, streaks, update cards, and an agent trail. Those elements made the prototype look broad before it proved that the learning experience itself was useful.
+
+The revised MVP starts inside the act of learning:
+
+- OpenAI / ChatGPT-inspired dark mode, without copying official branding.
+- A concept path on the left, one active learning module in the center, and a persistent notebook on the right.
+- Four explicit modes: Read, Recall, Apply, and Reflect.
+- Source-grounded material from official OpenAI documentation.
+- Real adaptation: a weak recall answer offers a visual sequence or a concrete example before retrying.
+- Hands-on application that checks an actual Responses API compaction configuration.
+- No fake streaks, vanity mastery percentages, decorative agent logs, or dashboard as the first screen.
+
+The three-minute demo should prove one claim: Current does not merely answer questions about a topic. It structures the work required to understand it, notices the missing link, and changes the next learning interaction accordingly.

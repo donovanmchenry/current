@@ -15,16 +15,16 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: new URL(origin),
     title: "Current · Keep your knowledge current",
-    description: "A living learning system that detects what changed, teaches the difference, and makes it stick.",
+    description: "A dark, adaptive learning workspace for understanding fast-changing fields through reading, recall, application, and reflection.",
     openGraph: {
       title: "Current",
-      description: "Keep your knowledge current.",
-      images: [{ url: `${origin}/og.png`, width: 1732, height: 909, alt: "Current learning workflow" }],
+      description: "Learn what changed. Prove what you understand.",
+      images: [{ url: `${origin}/og.png`, width: 1731, height: 909, alt: "Current dark-mode learning workspace" }],
     },
     twitter: {
       card: "summary_large_image",
       title: "Current",
-      description: "Keep your knowledge current.",
+      description: "Learn what changed. Prove what you understand.",
       images: [`${origin}/og.png`],
     },
   };

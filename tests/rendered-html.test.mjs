@@ -20,9 +20,10 @@ test("server-renders the Current product shell", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Current · Keep your knowledge current<\/title>/i);
-  assert.match(html, /Good afternoon, Donovan/);
-  assert.match(html, /GPT-5\.6 Sol is now the default frontier model/);
-  assert.match(html, /Agent trail/);
+  assert.match(html, /Long-running agent context/);
+  assert.match(html, /What compaction actually preserves/);
+  assert.match(html, /Recall/);
+  assert.doesNotMatch(html, /Good afternoon|day streak|Agent trail/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
@@ -34,7 +35,9 @@ test("returns a deterministic evaluation when no API key is configured", async (
     new Request("http://localhost/api/coach", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ answer: "gpt-5.6 is an alias routing to Sol; the explicit ID is clearer in config." }),
+      body: JSON.stringify({
+        answer: "Crossing the configured token threshold creates an opaque compaction item that preserves key state and reasoning. With previous_response_id, the next request sends only the new user message.",
+      }),
     }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
@@ -43,5 +46,26 @@ test("returns a deterministic evaluation when no API key is configured", async (
   assert.equal(response.status, 200);
   const evaluation = await response.json();
   assert.ok(evaluation.score >= 75);
+  assert.equal(evaluation.mode, "demo");
+});
+
+test("identifies the missing link in an incomplete recall answer", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-adaptive-api`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/api/coach", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ answer: "Compaction starts when the token threshold is crossed." }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  assert.equal(response.status, 200);
+  const evaluation = await response.json();
+  assert.ok(evaluation.score < 75);
+  assert.match(evaluation.misconception, /opaque item|next chained request/i);
   assert.equal(evaluation.mode, "demo");
 });
