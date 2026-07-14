@@ -42,8 +42,8 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.doesNotMatch(source, /startViewTransition|flushSync|transitionPhase|modeDirection/);
   assert.doesNotMatch(source, /RightTab|rightTab|sources-pane|notebook-tabs|notebook-heading|PanelLeftClose|className="close-notebook"/);
   assert.match(styles, /--background:.*--foreground:.*--primary:.*--ring:.*--radius:/s);
-  assert.match(styles, /--primary:\s*174 72% 45%/);
-  assert.doesNotMatch(styles, /16,163,127|--primary:\s*160/);
+  assert.match(styles, /--primary:\s*211 90% 58%/);
+  assert.doesNotMatch(styles, /16,163,127|45,212,191|--primary:\s*(?:160|174)/);
   assert.match(styles, /:focus-visible.*outline: 2px solid hsl\(var\(--ring\)\)/s);
   assert.match(styles, /\.mode-switcher[^}]*border-radius:\s*999px/s);
   assert.match(styles, /\.mode-switcher::before[^}]*transition:\s*transform/s);
