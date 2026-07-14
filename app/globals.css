@@ -110,7 +110,7 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .track-title strong { font-size: 13px; font-weight: 550; }
 .track-title small { margin-top: 2px; color: var(--text-muted); font-size: 10px; }
 .concept-path { position: relative; display: grid; gap: 2px; margin: 18px 0 0; padding: 0; list-style: none; }
-.concept-path::before { content: ""; position: absolute; left: 21px; top: 18px; bottom: 18px; width: 1px; background: var(--line); }
+.concept-path::before { content: ""; position: absolute; left: 17px; top: 18px; bottom: 18px; width: 1px; background: var(--line); }
 .concept-path li { position: relative; z-index: 1; }
 .concept-row { width: 100%; min-height: 43px; display: grid; grid-template-columns: 25px 1fr auto; align-items: center; gap: 7px; padding: 0 8px; border-radius: calc(var(--radius) - 1px); color: var(--text-secondary); font-size: 12px; }
 .concept-path li.current .concept-row { color: var(--text); background: var(--bg-elevated); }
