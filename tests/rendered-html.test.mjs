@@ -31,6 +31,7 @@ test("server-renders the Current product shell", async () => {
 
 test("keeps sources in the course sidebar and the notebook notes-only", async () => {
   const source = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
   assert.match(source, /sidebar-sources-viewport \$\{sourcesOpen \? "open"/);
   assert.match(source, /aria-pressed=\{notebookOpen\}/);
@@ -38,6 +39,8 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.match(source, /mode-stage \$\{transitionPhase\} \$\{modeDirection\}/);
   assert.match(source, /transitionToMode\("recall"\).*transitionToMode\("apply"\).*transitionToMode\("reflect"\)/s);
   assert.doesNotMatch(source, /RightTab|rightTab|sources-pane|notebook-tabs|notebook-heading|PanelLeftClose|className="close-notebook"/);
+  assert.match(styles, /--background:.*--foreground:.*--primary:.*--ring:.*--radius:/s);
+  assert.match(styles, /:focus-visible.*outline: 2px solid hsl\(var\(--ring\)\)/s);
 });
 
 test("returns a deterministic evaluation when no API key is configured", async () => {
