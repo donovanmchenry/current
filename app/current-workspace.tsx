@@ -205,7 +205,6 @@ export function CurrentWorkspace() {
 
       <aside className={`course-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-mobile-head"><span>Course outline</span><button className="icon-action" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button></div>
-        <div className="outline-heading"><span>Learning path</span></div>
         <div className="track-title">
           <span className="track-icon"><FolderOpen size={16} /></span>
           <div><strong>Long-running agents</strong><small>OpenAI API · 5 concepts</small></div>
@@ -331,7 +330,6 @@ function ReadModule({ highlighted, addToNotes, next }: { highlighted: boolean; a
   return (
     <article className="lesson-module read-module">
       <header className="module-header">
-        <div className="module-kicker"><span>Official guide</span><span>6 min</span></div>
         <h1>What compaction actually preserves</h1>
         <p>Long-running agents eventually accumulate more context than is useful to carry turn by turn. Compaction reduces that context without forcing the agent to begin again.</p>
       </header>
@@ -349,7 +347,7 @@ function ReadModule({ highlighted, addToNotes, next }: { highlighted: boolean; a
 
       <section className="source-excerpt">
         <div className="excerpt-top"><span><FileText size={14} /> Source-backed note</span><a href="https://developers.openai.com/api/docs/guides/compaction" target="_blank" rel="noreferrer">Open source <ExternalLink size={12} /></a></div>
-        <blockquote className={highlighted ? "highlighted" : ""}>Compaction reduces context size while preserving the state needed for later turns. The returned item carries forward key prior state and reasoning using fewer tokens.</blockquote>
+        <blockquote>Compaction reduces context size while preserving the state needed for later turns. The returned item carries forward key prior state and reasoning using fewer tokens.</blockquote>
         <button className={highlighted ? "excerpt-action added" : "excerpt-action"} disabled={highlighted} onClick={addToNotes}><Highlighter size={14} />{highlighted ? "Added to notes" : "Add to notes"}</button>
       </section>
 
@@ -381,7 +379,6 @@ function RecallModule(props: {
   return (
     <article className="lesson-module recall-module">
       <header className="module-header compact-header">
-        <div className="module-kicker"><span>Active recall</span><span>No source visible</span></div>
         <h1>Rebuild the idea from memory.</h1>
         <p>What triggers server-side compaction, what does it preserve, and what should the next request contain when using <code>previous_response_id</code>?</p>
       </header>
@@ -437,7 +434,6 @@ function ApplyModule({ choice, setChoice, checked, check, next }: { choice: numb
   return (
     <article className="lesson-module apply-module">
       <header className="module-header compact-header">
-        <div className="module-kicker"><span>Hands-on</span><span>Responses API</span></div>
         <h1>Enable server-side compaction.</h1>
         <p>Choose the configuration that triggers compaction after the rendered context crosses 200,000 tokens.</p>
       </header>
@@ -460,7 +456,6 @@ function ReflectModule({ reflection, setReflection, nextReview, schedule }: { re
   return (
     <article className="lesson-module reflect-module">
       <header className="module-header compact-header">
-        <div className="module-kicker"><span>Reflection</span><span>1 minute</span></div>
         <h1>Connect it to something you would build.</h1>
         <p>Name one situation where you would choose server-side compaction and one implementation mistake you now know to avoid.</p>
       </header>

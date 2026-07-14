@@ -25,6 +25,7 @@ test("server-renders the Current product shell", async () => {
   assert.match(html, /What compaction actually preserves/);
   assert.match(html, /Recall/);
   assert.match(html, /Sources/);
+  assert.doesNotMatch(html, /Official guide|Active recall|No source visible|Hands-on|1 minute|Learning path/i);
   assert.doesNotMatch(html, /Good afternoon|day streak|Agent trail|New learning track|Make recall prompt|Change the practice|How this track adapts/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
@@ -41,6 +42,7 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.doesNotMatch(source, /RightTab|rightTab|sources-pane|notebook-tabs|notebook-heading|PanelLeftClose|className="close-notebook"/);
   assert.match(styles, /--background:.*--foreground:.*--primary:.*--ring:.*--radius:/s);
   assert.match(styles, /:focus-visible.*outline: 2px solid hsl\(var\(--ring\)\)/s);
+  assert.doesNotMatch(styles, /text-transform:\s*uppercase/);
 });
 
 test("returns a deterministic evaluation when no API key is configured", async () => {
