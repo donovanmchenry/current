@@ -190,7 +190,7 @@ export function CurrentWorkspace() {
       <header className="workspace-header">
         <div className="header-left">
           <button className="icon-action mobile-only" aria-label="Open course outline" onClick={() => setSidebarOpen(true)}><Menu size={18} /></button>
-          <div className="wordmark"><span className="wordmark-symbol">C</span><span>Current</span></div>
+          <div className="wordmark"><span>Current</span></div>
           <span className="header-separator" />
           <span className="track-context">AI agent engineering</span>
         </div>
