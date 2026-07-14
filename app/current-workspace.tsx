@@ -191,15 +191,17 @@ export function CurrentWorkspace() {
         </ol>
 
         <div className="sidebar-bottom">
-          <div className={`sidebar-sources ${sourcesOpen ? "open" : ""}`} aria-hidden={!sourcesOpen}>
-            <div className="sidebar-sources-heading"><span>Official sources</span><small>For this concept</small></div>
-            {sources.map((source) => (
-              <a href={source.href} target="_blank" rel="noreferrer" tabIndex={sourcesOpen ? 0 : -1} className="sidebar-source-item" key={source.title}>
-                <FileText size={14} />
-                <span><strong>{source.title}</strong><small>{source.detail}</small></span>
-                <ExternalLink size={12} />
-              </a>
-            ))}
+          <div className={`sidebar-sources-drawer ${sourcesOpen ? "open" : ""}`} aria-hidden={!sourcesOpen}>
+            <div className="sidebar-sources">
+              <div className="sidebar-sources-heading"><span>Official sources</span><small>For this concept</small></div>
+              {sources.map((source) => (
+                <a href={source.href} target="_blank" rel="noreferrer" tabIndex={sourcesOpen ? 0 : -1} className="sidebar-source-item" key={source.title}>
+                  <FileText size={14} />
+                  <span><strong>{source.title}</strong><small>{source.detail}</small></span>
+                  <ExternalLink size={12} />
+                </a>
+              ))}
+            </div>
           </div>
           <button aria-expanded={sourcesOpen} onClick={() => setSourcesOpen((value) => !value)}><FileText size={15} /><span>Sources</span><small>{sources.length}</small><ChevronDown className={sourcesOpen ? "expanded" : ""} size={14} /></button>
         </div>
