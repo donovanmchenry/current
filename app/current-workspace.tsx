@@ -23,15 +23,10 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { scheduleReview } from "../lib/spaced-review";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
-type TransitionPhase = "idle" | "leaving" | "entering" | "viewing";
-
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (update: () => void) => { finished: Promise<void> };
-};
+type TransitionPhase = "idle" | "entering";
 
 type Evaluation = {
   score: number;
@@ -134,34 +129,14 @@ export function CurrentWorkspace() {
       return;
     }
 
-    const transitionDocument = document as ViewTransitionDocument;
-    if (transitionDocument.startViewTransition) {
-      flushSync(() => {
-        setModeDirection(direction);
-        setTransitionPhase("viewing");
-      });
-      const viewTransition = transitionDocument.startViewTransition(() => {
-        lessonScrollRef.current?.scrollTo({ top: 0 });
-        flushSync(() => setMode(nextMode));
-      });
-      void viewTransition.finished.then(
-        () => setTransitionPhase("idle"),
-        () => setTransitionPhase("idle"),
-      );
-      return;
-    }
-
+    lessonScrollRef.current?.scrollTo({ top: 0 });
     setModeDirection(direction);
-    setTransitionPhase("leaving");
+    setMode(nextMode);
+    setTransitionPhase("entering");
     transitionTimer.current = window.setTimeout(() => {
-      lessonScrollRef.current?.scrollTo({ top: 0 });
-      setMode(nextMode);
-      setTransitionPhase("entering");
-      transitionTimer.current = window.setTimeout(() => {
-        setTransitionPhase("idle");
-        transitionTimer.current = null;
-      }, 260);
-    }, 90);
+      setTransitionPhase("idle");
+      transitionTimer.current = null;
+    }, 260);
   };
 
   const addExcerptToNotes = () => {

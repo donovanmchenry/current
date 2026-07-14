@@ -200,23 +200,12 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .notebook-toggle { min-height: 31px; display: inline-flex; align-items: center; justify-self: end; gap: 6px; border: 0; border-radius: 8px; padding: 0 9px; color: var(--text-secondary); background: transparent; font-size: 11px; cursor: pointer; }
 .notebook-toggle:hover, .notebook-toggle.active { color: var(--text); background: #202020; }
 .lesson-scroll { position: absolute; inset: 54px 0 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: #555 transparent; }
-.mode-stage { min-height: 100%; view-transition-name: lesson-content; }
-.mode-stage.leaving, .mode-stage.entering, .mode-stage.viewing { pointer-events: none; }
-.mode-stage.leaving.forward { animation: mode-leave-forward .09s ease-out both; }
-.mode-stage.leaving.backward { animation: mode-leave-backward .09s ease-out both; }
+.mode-stage { min-height: 100%; }
+.mode-stage.entering { pointer-events: none; }
 .mode-stage.entering.forward { animation: mode-enter-forward .26s cubic-bezier(.22, 1, .36, 1) both; }
 .mode-stage.entering.backward { animation: mode-enter-backward .26s cubic-bezier(.22, 1, .36, 1) both; }
-@keyframes mode-leave-forward { to { opacity: 0; transform: translate3d(-5px, -2px, 0); } }
-@keyframes mode-leave-backward { to { opacity: 0; transform: translate3d(5px, -2px, 0); } }
-@keyframes mode-enter-forward { from { opacity: 0; transform: translate3d(7px, 5px, 0); } }
-@keyframes mode-enter-backward { from { opacity: 0; transform: translate3d(-7px, 5px, 0); } }
-::view-transition-old(root) { animation: none; opacity: 0; }
-::view-transition-new(root) { animation: none; }
-::view-transition-group(lesson-content) { animation-duration: .35s; animation-timing-function: cubic-bezier(.22, 1, .36, 1); }
-::view-transition-old(lesson-content) { animation: lesson-view-leave .11s ease-out both; }
-::view-transition-new(lesson-content) { animation: lesson-view-enter .28s .07s cubic-bezier(.22, 1, .36, 1) both; }
-@keyframes lesson-view-leave { to { opacity: 0; transform: translate3d(0, -3px, 0); } }
-@keyframes lesson-view-enter { from { opacity: 0; transform: translate3d(0, 6px, 0); } }
+@keyframes mode-enter-forward { from { transform: translate3d(7px, 5px, 0); } }
+@keyframes mode-enter-backward { from { transform: translate3d(-7px, 5px, 0); } }
 .lesson-module { width: min(720px, calc(100% - 48px)); margin: 0 auto; padding: 45px 0 60px; }
 .module-header { padding-bottom: 31px; border-bottom: 1px solid var(--line); }
 .module-header.compact-header { padding-bottom: 25px; }
