@@ -34,6 +34,7 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
 
   assert.match(source, /sidebar-sources-viewport \$\{sourcesOpen \? "open"/);
   assert.match(source, /aria-pressed=\{notebookOpen\}/);
+  assert.match(source, /notebook-panel \$\{notebookOpen \? "open".*aria-hidden=\{!notebookOpen\}/s);
   assert.doesNotMatch(source, /RightTab|rightTab|sources-pane|notebook-tabs|notebook-heading|PanelLeftClose|className="close-notebook"/);
 });
 

@@ -168,7 +168,7 @@ export function CurrentWorkspace() {
       </header>
 
       {sidebarOpen ? <button className="overlay" aria-label="Close course outline" onClick={() => setSidebarOpen(false)} /> : null}
-      {notebookOpen ? <button className="notebook-overlay" aria-label="Close notebook" onClick={() => setNotebookOpen(false)} /> : null}
+      <button className={`notebook-overlay ${notebookOpen ? "open" : ""}`} aria-label="Close notebook" aria-hidden={!notebookOpen} tabIndex={notebookOpen ? 0 : -1} onClick={() => setNotebookOpen(false)} />
 
       <aside className={`course-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-mobile-head"><span>Course outline</span><button className="icon-action" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button></div>
@@ -270,7 +270,7 @@ export function CurrentWorkspace() {
         </div>
       </main>
 
-      <aside className={`notebook-panel ${notebookOpen ? "open" : ""}`}>
+      <aside className={`notebook-panel ${notebookOpen ? "open" : ""}`} aria-hidden={!notebookOpen}>
         <div className="notes-pane">
           <div className="note-document-title">
             <div><span>Compaction notes</span><small>Saved on this device</small></div>
@@ -278,6 +278,7 @@ export function CurrentWorkspace() {
           <textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
+            tabIndex={notebookOpen ? 0 : -1}
             placeholder={"Write while you learn…\n\nTry explaining the purpose of compaction without copying the source."}
             aria-label="Learning notes"
           />
