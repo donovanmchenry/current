@@ -1,39 +1,29 @@
 "use client";
 
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   Brain,
   Check,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   CircleHelp,
   Code2,
-  Command,
   ExternalLink,
   FileText,
   FolderOpen,
   Highlighter,
-  History,
-  Library,
   ListChecks,
   Menu,
-  MoreHorizontal,
   NotebookPen,
   PanelLeftClose,
   Play,
-  Plus,
   RotateCcw,
-  Search,
   Send,
-  Settings2,
-  Sparkles,
-  Timer,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { scheduleReview } from "../lib/spaced-review";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
 type RightTab = "notes" | "sources";
@@ -60,12 +50,6 @@ const sources = [
     detail: "Responses, conversations, and chaining",
     href: "https://developers.openai.com/api/docs/guides/conversation-state",
   },
-  {
-    title: "GPT-5.6 Sol",
-    domain: "OpenAI model docs",
-    detail: "Context window and supported tools",
-    href: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
-  },
 ];
 
 const concepts = [
@@ -83,6 +67,8 @@ const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
   { id: "reflect", label: "Reflect", icon: NotebookPen },
 ];
 
+const noteExcerpt = "Compaction preserves key prior state in an opaque item while using fewer tokens.";
+
 export function CurrentWorkspace() {
   const [mode, setMode] = useState<Mode>("read");
   const [rightTab, setRightTab] = useState<RightTab>("notes");
@@ -93,35 +79,41 @@ export function CurrentWorkspace() {
   const [supportMode, setSupportMode] = useState<"none" | "visual" | "example">("none");
   const [codeChoice, setCodeChoice] = useState<number | null>(null);
   const [codeChecked, setCodeChecked] = useState(false);
+  const [recallPassed, setRecallPassed] = useState(false);
   const [reflection, setReflection] = useState("");
-  const [reviewScheduled, setReviewScheduled] = useState(false);
+  const [nextReview, setNextReview] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [notebookOpen, setNotebookOpen] = useState(true);
-  const [secondsLeft, setSecondsLeft] = useState(18 * 60 + 24);
+  const [notebookOpen, setNotebookOpen] = useState(false);
+  const hydrated = useRef(false);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("current-notebook-v2");
-    if (!saved) return;
-    const frame = window.requestAnimationFrame(() => setNotes(saved));
+    const savedNotes = window.localStorage.getItem("current-notebook-v2") ?? "";
+    const savedReflection = window.localStorage.getItem("current-reflection-v1") ?? "";
+    const savedReview = window.localStorage.getItem("current-review-v1");
+    const frame = window.requestAnimationFrame(() => {
+      setNotes(savedNotes);
+      setReflection(savedReflection);
+      setNextReview(savedReview);
+      setHighlighted(savedNotes.includes(noteExcerpt));
+      hydrated.current = true;
+    });
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
+    if (!hydrated.current) return;
     window.localStorage.setItem("current-notebook-v2", notes);
-  }, [notes]);
+    window.localStorage.setItem("current-reflection-v1", reflection);
+    if (nextReview) window.localStorage.setItem("current-review-v1", nextReview);
+  }, [nextReview, notes, reflection]);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setSecondsLeft((value) => Math.max(0, value - 1)), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const minutes = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
-  const seconds = String(secondsLeft % 60).padStart(2, "0");
+  const modeIndex = modeItems.findIndex((item) => item.id === mode);
+  const recallComplete = recallPassed || Boolean(nextReview);
+  const codePassed = (codeChecked && codeChoice === 1) || Boolean(nextReview);
 
   const addExcerptToNotes = () => {
-    const excerpt = "Compaction preserves key prior state in an opaque item while using fewer tokens.";
-    setNotes((value) => value ? `${value}\n\n${excerpt}` : excerpt);
+    setNotes((value) => value.includes(noteExcerpt) ? value : value ? `${value}\n\n${noteExcerpt}` : noteExcerpt);
     setHighlighted(true);
     setRightTab("notes");
     setNotebookOpen(true);
@@ -137,9 +129,13 @@ export function CurrentWorkspace() {
         body: JSON.stringify({ answer: recallAnswer, lesson: "compaction" }),
       });
       if (!response.ok) throw new Error("Evaluation failed");
-      setEvaluation((await response.json()) as Evaluation);
+      const result = (await response.json()) as Evaluation;
+      setEvaluation(result);
+      if (result.score >= 75) setRecallPassed(true);
     } catch {
-      setEvaluation(localEvaluation(recallAnswer));
+      const result = localEvaluation(recallAnswer);
+      setEvaluation(result);
+      if (result.score >= 75) setRecallPassed(true);
     } finally {
       setIsEvaluating(false);
     }
@@ -148,7 +144,6 @@ export function CurrentWorkspace() {
   const resetRecall = () => {
     setRecallAnswer("");
     setEvaluation(null);
-    setSupportMode("none");
   };
 
   const checkCode = () => {
@@ -156,73 +151,61 @@ export function CurrentWorkspace() {
     setCodeChecked(true);
   };
 
+  const finishAndSchedule = () => {
+    const schedule = scheduleReview({ intervalDays: 1, ease: 2.5, repetitions: 0 }, 4);
+    setNextReview(schedule.nextReview.toISOString());
+  };
+
   return (
     <div className={`current-app ${notebookOpen ? "with-notebook" : ""}`}>
       <header className="workspace-header">
         <div className="header-left">
           <button className="icon-action mobile-only" aria-label="Open course outline" onClick={() => setSidebarOpen(true)}><Menu size={18} /></button>
-          <button className="wordmark" aria-label="Current home"><span className="wordmark-symbol"><Command size={15} /></span><span>Current</span></button>
+          <div className="wordmark"><span className="wordmark-symbol">C</span><span>Current</span></div>
           <span className="header-separator" />
-          <button className="track-switcher">AI agent engineering <ChevronDown size={14} /></button>
+          <span className="track-context">AI agent engineering</span>
         </div>
-        <div className="header-center">
-          <span className="lesson-name">Long-running agent context</span>
-          <span className="save-state"><Check size={12} /> Saved</span>
-        </div>
+        <div className="header-center"><span className="lesson-name">Long-running agent context</span></div>
         <div className="header-right">
-          <span className="focus-timer"><Timer size={14} /><strong>{minutes}:{seconds}</strong></span>
-          <button className="icon-action" aria-label="Search"><Search size={17} /></button>
-          <button className="icon-action" aria-label="More options"><MoreHorizontal size={18} /></button>
-          <button className="user-avatar" aria-label="Profile">D</button>
+          <span className="header-progress">Concept 2 of 5</span>
         </div>
       </header>
 
       {sidebarOpen ? <button className="overlay" aria-label="Close course outline" onClick={() => setSidebarOpen(false)} /> : null}
+      {notebookOpen ? <button className="notebook-overlay" aria-label="Close notebook" onClick={() => setNotebookOpen(false)} /> : null}
 
       <aside className={`course-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-mobile-head"><span>Course outline</span><button className="icon-action" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button></div>
-        <button className="new-track"><Plus size={16} /> New learning track</button>
-        <nav className="utility-nav" aria-label="Workspace">
-          <button><Search size={16} /> Search</button>
-          <button><Library size={16} /> Library</button>
-          <button><History size={16} /> Review</button>
-        </nav>
-
-        <div className="outline-heading">
-          <span>Current track</span>
-          <button aria-label="Track settings"><Settings2 size={15} /></button>
-        </div>
+        <div className="outline-heading"><span>Learning path</span></div>
         <div className="track-title">
           <span className="track-icon"><FolderOpen size={16} /></span>
           <div><strong>Long-running agents</strong><small>OpenAI API · 5 concepts</small></div>
         </div>
-        <div className="track-progress"><span /></div>
 
         <ol className="concept-path">
           {concepts.map((concept, index) => (
             <li className={concept.status} key={concept.label}>
-              <button disabled={concept.status === "locked"} onClick={() => concept.status !== "locked" && index === 1 && setMode("read")}>
+              <div className="concept-row">
                 <span className="concept-state">{concept.status === "done" ? <Check size={11} /> : index + 1}</span>
                 <span>{concept.label}</span>
                 {concept.status === "current" ? <span className="now-label">Now</span> : null}
-              </button>
+              </div>
             </li>
           ))}
         </ol>
 
         <div className="sidebar-bottom">
-          <button onClick={() => { setRightTab("sources"); setNotebookOpen(true); }}><FileText size={15} /><span>Sources</span><small>3</small></button>
-          <button><CircleHelp size={15} /><span>How this track adapts</span></button>
+          <button onClick={() => { setRightTab("sources"); setNotebookOpen(true); }}><FileText size={15} /><span>Sources</span><small>{sources.length}</small></button>
         </div>
       </aside>
 
       <main className="learning-canvas">
         <div className="lesson-toolbar">
-          <button className="back-control"><ArrowLeft size={15} /><span>Concepts</span></button>
+          <span className="stage-count">Step {modeIndex + 1} of {modeItems.length}</span>
           <div className="mode-switcher" role="tablist" aria-label="Learning mode">
             {modeItems.map((item) => {
               const Icon = item.icon;
-              const locked = item.id === "reflect" && !(codeChecked && codeChoice === 1);
+              const locked = (item.id === "apply" && !recallComplete) || (item.id === "reflect" && !codePassed);
               return (
                 <button
                   role="tab"
@@ -230,6 +213,8 @@ export function CurrentWorkspace() {
                   disabled={locked}
                   className={mode === item.id ? "active" : ""}
                   onClick={() => setMode(item.id)}
+                  aria-label={locked ? `${item.label} locked` : item.label}
+                  title={item.label}
                   key={item.id}
                 >
                   <Icon size={14} />{item.label}
@@ -237,11 +222,11 @@ export function CurrentWorkspace() {
               );
             })}
           </div>
-          <button className="icon-action notebook-toggle" aria-label={notebookOpen ? "Close notebook" : "Open notebook"} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={17} /></button>
+          <button className="notebook-toggle" aria-label={notebookOpen ? "Close notebook" : "Open notebook"} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
         </div>
 
         <div className="lesson-scroll">
-          {mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => setMode("recall")} /> : null}
+          {mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); setMode("recall"); }} /> : null}
           {mode === "recall" ? (
             <RecallModule
               answer={recallAnswer}
@@ -268,8 +253,8 @@ export function CurrentWorkspace() {
             <ReflectModule
               reflection={reflection}
               setReflection={setReflection}
-              scheduled={reviewScheduled}
-              schedule={() => setReviewScheduled(true)}
+              nextReview={nextReview}
+              schedule={finishAndSchedule}
             />
           ) : null}
         </div>
@@ -278,15 +263,14 @@ export function CurrentWorkspace() {
       <aside className={`notebook-panel ${notebookOpen ? "open" : ""}`}>
         <div className="notebook-tabs" role="tablist">
           <button role="tab" aria-selected={rightTab === "notes"} className={rightTab === "notes" ? "active" : ""} onClick={() => setRightTab("notes")}><NotebookPen size={14} /> Notes</button>
-          <button role="tab" aria-selected={rightTab === "sources"} className={rightTab === "sources" ? "active" : ""} onClick={() => setRightTab("sources")}><FileText size={14} /> Sources <span>3</span></button>
+          <button role="tab" aria-selected={rightTab === "sources"} className={rightTab === "sources" ? "active" : ""} onClick={() => setRightTab("sources")}><FileText size={14} /> Sources <span>{sources.length}</span></button>
           <button className="close-notebook" aria-label="Close notebook" onClick={() => setNotebookOpen(false)}><PanelLeftClose size={16} /></button>
         </div>
 
         {rightTab === "notes" ? (
           <div className="notes-pane">
             <div className="note-document-title">
-              <div><span>Compaction</span><small>Private working note</small></div>
-              <button aria-label="Note options"><MoreHorizontal size={17} /></button>
+              <div><span>Compaction notes</span><small>Saved on this device</small></div>
             </div>
             <textarea
               value={notes}
@@ -296,12 +280,12 @@ export function CurrentWorkspace() {
             />
             <div className="note-footer">
               <span>{notes.trim() ? `${notes.trim().split(/\s+/).length} words` : "0 words"}</span>
-              <button disabled={!notes.trim()}><Sparkles size={14} /> Make recall prompt</button>
+              <span>Autosaved</span>
             </div>
           </div>
         ) : (
           <div className="sources-pane">
-            <div className="source-pane-heading"><span>Grounding this concept</span><small>Official sources only</small></div>
+            <div className="source-pane-heading"><span>Official sources</span><small>Used for this lesson</small></div>
             {sources.map((source, index) => (
               <a href={source.href} target="_blank" rel="noreferrer" className="source-item" key={source.title}>
                 <span className="source-number">0{index + 1}</span>
@@ -309,22 +293,9 @@ export function CurrentWorkspace() {
                 <ExternalLink size={13} />
               </a>
             ))}
-            <div className="source-rule"><CheckCircle2 size={15} /><p><strong>Source rule</strong>Current will not update this concept from community posts unless you approve them.</p></div>
           </div>
         )}
       </aside>
-
-      <div className="command-dock">
-        <div className="dock-inner">
-          <Command size={15} />
-          <span>Change the practice:</span>
-          <button onClick={() => { setMode("recall"); setSupportMode("visual"); }}>show a visual</button>
-          <button onClick={() => { setMode("recall"); setSupportMode("example"); }}>use an example</button>
-          <button onClick={() => setMode("apply")}>give me code</button>
-          <span className="dock-spacer" />
-          <kbd>⌘ ↵</kbd>
-        </div>
-      </div>
     </div>
   );
 }
@@ -333,7 +304,7 @@ function ReadModule({ highlighted, addToNotes, next }: { highlighted: boolean; a
   return (
     <article className="lesson-module read-module">
       <header className="module-header">
-        <div className="module-kicker"><span>Concept 2</span><span>6 min</span><span>Updated from source</span></div>
+        <div className="module-kicker"><span>Official guide</span><span>6 min</span></div>
         <h1>What compaction actually preserves</h1>
         <p>Long-running agents eventually accumulate more context than is useful to carry turn by turn. Compaction reduces that context without forcing the agent to begin again.</p>
       </header>
@@ -352,7 +323,7 @@ function ReadModule({ highlighted, addToNotes, next }: { highlighted: boolean; a
       <section className="source-excerpt">
         <div className="excerpt-top"><span><FileText size={14} /> Source-backed note</span><a href="https://developers.openai.com/api/docs/guides/compaction" target="_blank" rel="noreferrer">Open source <ExternalLink size={12} /></a></div>
         <blockquote className={highlighted ? "highlighted" : ""}>Compaction reduces context size while preserving the state needed for later turns. The returned item carries forward key prior state and reasoning using fewer tokens.</blockquote>
-        <button className={highlighted ? "excerpt-action added" : "excerpt-action"} onClick={addToNotes}><Highlighter size={14} />{highlighted ? "Added to notes" : "Add the idea to notes"}</button>
+        <button className={highlighted ? "excerpt-action added" : "excerpt-action"} disabled={highlighted} onClick={addToNotes}><Highlighter size={14} />{highlighted ? "Added to notes" : "Add to notes"}</button>
       </section>
 
       <section className="reading-section">
@@ -401,12 +372,11 @@ function RecallModule(props: {
         <div className={`evaluation-result ${needsSupport ? "partial" : "strong"}`}>
           <div className="result-mark">{needsSupport ? <CircleHelp size={18} /> : <Check size={18} />}</div>
           <div>
-            <span>{props.evaluation.mode === "live" ? "Evaluated by GPT-5.6 Sol" : "Demo evaluator"}</span>
+            <span>{props.evaluation.mode === "live" ? "Evaluated by GPT-5.6 Sol" : "Checked against the lesson"}</span>
             <h2>{props.evaluation.verdict}</h2>
             <p>{props.evaluation.feedback}</p>
             {props.evaluation.misconception ? <div className="gap-line"><strong>Missing link</strong>{props.evaluation.misconception}</div> : null}
           </div>
-          <strong className="result-score">{props.evaluation.score}</strong>
         </div>
       ) : null}
 
@@ -458,7 +428,8 @@ function ApplyModule({ choice, setChoice, checked, check, next }: { choice: numb
   );
 }
 
-function ReflectModule({ reflection, setReflection, scheduled, schedule }: { reflection: string; setReflection: (value: string) => void; scheduled: boolean; schedule: () => void }) {
+function ReflectModule({ reflection, setReflection, nextReview, schedule }: { reflection: string; setReflection: (value: string) => void; nextReview: string | null; schedule: () => void }) {
+  const reviewDate = nextReview ? new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(nextReview)) : null;
   return (
     <article className="lesson-module reflect-module">
       <header className="module-header compact-header">
@@ -466,14 +437,14 @@ function ReflectModule({ reflection, setReflection, scheduled, schedule }: { ref
         <h1>Connect it to something you would build.</h1>
         <p>Name one situation where you would choose server-side compaction and one implementation mistake you now know to avoid.</p>
       </header>
-      <label className="recall-input reflection-input"><span>Commit the idea to memory</span><textarea value={reflection} onChange={(event) => setReflection(event.target.value)} placeholder="I would use this when…" /><small>This reflection becomes part of your concept history.</small></label>
+      <label className="recall-input reflection-input"><span>Your reflection</span><textarea value={reflection} onChange={(event) => setReflection(event.target.value)} placeholder="I would use this when…" /><small>Saved on this device.</small></label>
       <div className="session-summary">
         <div><Check size={14} /><span><strong>Read</strong>Source-backed mental model</span></div>
         <div><Check size={14} /><span><strong>Recalled</strong>Trigger, preserved state, next turn</span></div>
         <div><Check size={14} /><span><strong>Applied</strong>Correct API configuration</span></div>
       </div>
-      {scheduled ? <div className="scheduled-state"><CheckCircle2 size={18} /><div><strong>Review scheduled for tomorrow</strong><span>The next prompt will ask you to reconstruct the API shape without choices.</span></div></div> : null}
-      <footer className="module-footer"><span>{scheduled ? "Concept 2 complete. Stateless chaining is ready next." : "Shorter intervals follow effortful first recall."}</span><button className="continue-button" disabled={!reflection.trim() || scheduled} onClick={schedule}>{scheduled ? "Scheduled" : "Finish and schedule review"}<Check size={14} /></button></footer>
+      {reviewDate ? <div className="scheduled-state"><CheckCircle2 size={18} /><div><strong>Review scheduled for {reviewDate}</strong><span>You will reconstruct the API shape without choices.</span></div></div> : null}
+      <footer className="module-footer"><span>{reviewDate ? "Concept complete. The review date is saved on this device." : "Finish with one effortful review tomorrow."}</span><button className="continue-button" disabled={!reflection.trim() || Boolean(reviewDate)} onClick={schedule}>{reviewDate ? "Scheduled" : "Finish and schedule review"}<Check size={14} /></button></footer>
     </article>
   );
 }

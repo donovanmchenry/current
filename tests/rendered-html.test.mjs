@@ -23,7 +23,8 @@ test("server-renders the Current product shell", async () => {
   assert.match(html, /Long-running agent context/);
   assert.match(html, /What compaction actually preserves/);
   assert.match(html, /Recall/);
-  assert.doesNotMatch(html, /Good afternoon|day streak|Agent trail/i);
+  assert.match(html, /Sources/);
+  assert.doesNotMatch(html, /Good afternoon|day streak|Agent trail|New learning track|Make recall prompt|Change the practice|How this track adapts/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 

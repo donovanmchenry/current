@@ -36,7 +36,7 @@ function demoEvaluation(answer: string): Evaluation {
     verdict: score >= 78 ? "You have the handoff" : score >= 60 ? "One link is missing" : "Rebuild the sequence",
     feedback: score >= 78
       ? "You connected the trigger, preserved state, and next-request behavior into one accurate sequence."
-      : `Add ${missing[0] ?? "the relationship between the compact item and the next request"}.`,
+      : `Your explanation still needs ${missing[0] ?? "the relationship between the compact item and the next request"}.`,
     misconception: score >= 78 ? null : missing.join("; "),
     nextPrompt: score >= 78 ? "Configure compaction for a long-running agent." : "Try the visual sequence, then explain the handoff again.",
     mode: "demo",
