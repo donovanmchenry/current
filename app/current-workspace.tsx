@@ -23,10 +23,15 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { scheduleReview } from "../lib/spaced-review";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
-type TransitionPhase = "idle" | "leaving" | "entering";
+type TransitionPhase = "idle" | "leaving" | "entering" | "viewing";
+
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (update: () => void) => { finished: Promise<void> };
+};
 
 type Evaluation = {
   score: number;
@@ -122,7 +127,6 @@ export function CurrentWorkspace() {
     if (nextMode === mode || transitionPhase !== "idle") return;
     const nextIndex = modeItems.findIndex((item) => item.id === nextMode);
     const direction = nextIndex > modeIndex ? "forward" : "backward";
-    setModeDirection(direction);
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       lessonScrollRef.current?.scrollTo({ top: 0 });
@@ -130,6 +134,24 @@ export function CurrentWorkspace() {
       return;
     }
 
+    const transitionDocument = document as ViewTransitionDocument;
+    if (transitionDocument.startViewTransition) {
+      flushSync(() => {
+        setModeDirection(direction);
+        setTransitionPhase("viewing");
+      });
+      const viewTransition = transitionDocument.startViewTransition(() => {
+        lessonScrollRef.current?.scrollTo({ top: 0 });
+        flushSync(() => setMode(nextMode));
+      });
+      void viewTransition.finished.then(
+        () => setTransitionPhase("idle"),
+        () => setTransitionPhase("idle"),
+      );
+      return;
+    }
+
+    setModeDirection(direction);
     setTransitionPhase("leaving");
     transitionTimer.current = window.setTimeout(() => {
       lessonScrollRef.current?.scrollTo({ top: 0 });
@@ -138,8 +160,8 @@ export function CurrentWorkspace() {
       transitionTimer.current = window.setTimeout(() => {
         setTransitionPhase("idle");
         transitionTimer.current = null;
-      }, 320);
-    }, 140);
+      }, 260);
+    }, 90);
   };
 
   const addExcerptToNotes = () => {
@@ -244,7 +266,7 @@ export function CurrentWorkspace() {
       <main className="learning-canvas">
         <div className="lesson-toolbar">
           <span className="stage-count">Step {modeIndex + 1} of {modeItems.length}</span>
-          <div className="mode-switcher" role="tablist" aria-label="Learning mode">
+          <div className={"mode-switcher mode-step-" + modeIndex} role="tablist" aria-label="Learning mode">
             {modeItems.map((item) => {
               const Icon = item.icon;
               const locked = (item.id === "apply" && !recallComplete) || (item.id === "reflect" && !codePassed);
