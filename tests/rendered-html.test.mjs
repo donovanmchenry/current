@@ -37,15 +37,15 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.match(source, /sidebar-sources-viewport \$\{sourcesOpen \? "open"/);
   assert.match(source, /aria-pressed=\{notebookOpen\}/);
   assert.match(source, /notebook-panel \$\{notebookOpen \? "open".*aria-hidden=\{!notebookOpen\}/s);
-  assert.match(source, /mode-stage \$\{transitionPhase\} \$\{modeDirection\}/);
+  assert.match(source, /className="mode-stage"/);
   assert.match(source, /transitionToMode\("recall"\).*transitionToMode\("apply"\).*transitionToMode\("reflect"\)/s);
-  assert.doesNotMatch(source, /startViewTransition|flushSync/);
+  assert.doesNotMatch(source, /startViewTransition|flushSync|transitionPhase|modeDirection/);
   assert.doesNotMatch(source, /RightTab|rightTab|sources-pane|notebook-tabs|notebook-heading|PanelLeftClose|className="close-notebook"/);
   assert.match(styles, /--background:.*--foreground:.*--primary:.*--ring:.*--radius:/s);
   assert.match(styles, /:focus-visible.*outline: 2px solid hsl\(var\(--ring\)\)/s);
   assert.match(styles, /\.mode-switcher[^}]*border-radius:\s*999px/s);
   assert.match(styles, /\.mode-switcher::before[^}]*transition:\s*transform/s);
-  assert.doesNotMatch(styles, /view-transition|mode-enter-(?:forward|backward)[^}]*opacity/s);
+  assert.doesNotMatch(styles, /view-transition|mode-enter-(?:forward|backward)|\.mode-stage[^}]*transform/);
   assert.match(styles, /\.continue-button[^}]*background:\s*#f4f4f4/s);
   assert.match(styles, /\.concept-path::before[^}]*left:\s*17px/s);
   assert.doesNotMatch(styles, /text-transform:\s*uppercase/);

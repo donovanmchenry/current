@@ -26,7 +26,6 @@ import { useEffect, useRef, useState } from "react";
 import { scheduleReview } from "../lib/spaced-review";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
-type TransitionPhase = "idle" | "entering";
 
 type Evaluation = {
   score: number;
@@ -83,11 +82,8 @@ export function CurrentWorkspace() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [notebookOpen, setNotebookOpen] = useState(false);
-  const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>("idle");
-  const [modeDirection, setModeDirection] = useState<"forward" | "backward">("forward");
   const hydrated = useRef(false);
   const lessonScrollRef = useRef<HTMLDivElement>(null);
-  const transitionTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const savedNotes = window.localStorage.getItem("current-notebook-v2") ?? "";
@@ -110,33 +106,14 @@ export function CurrentWorkspace() {
     if (nextReview) window.localStorage.setItem("current-review-v1", nextReview);
   }, [nextReview, notes, reflection]);
 
-  useEffect(() => () => {
-    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
-  }, []);
-
   const modeIndex = modeItems.findIndex((item) => item.id === mode);
   const recallComplete = recallPassed || Boolean(nextReview);
   const codePassed = (codeChecked && codeChoice === 1) || Boolean(nextReview);
 
   const transitionToMode = (nextMode: Mode) => {
-    if (nextMode === mode || transitionPhase !== "idle") return;
-    const nextIndex = modeItems.findIndex((item) => item.id === nextMode);
-    const direction = nextIndex > modeIndex ? "forward" : "backward";
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      lessonScrollRef.current?.scrollTo({ top: 0 });
-      setMode(nextMode);
-      return;
-    }
-
+    if (nextMode === mode) return;
     lessonScrollRef.current?.scrollTo({ top: 0 });
-    setModeDirection(direction);
     setMode(nextMode);
-    setTransitionPhase("entering");
-    transitionTimer.current = window.setTimeout(() => {
-      setTransitionPhase("idle");
-      transitionTimer.current = null;
-    }, 260);
   };
 
   const addExcerptToNotes = () => {
@@ -249,7 +226,7 @@ export function CurrentWorkspace() {
                 <button
                   role="tab"
                   aria-selected={mode === item.id}
-                  disabled={locked || transitionPhase !== "idle"}
+                  disabled={locked}
                   className={mode === item.id ? "active" : ""}
                   onClick={() => transitionToMode(item.id)}
                   aria-label={locked ? `${item.label} locked` : item.label}
@@ -265,7 +242,7 @@ export function CurrentWorkspace() {
         </div>
 
         <div className="lesson-scroll" ref={lessonScrollRef}>
-          <div className={`mode-stage ${transitionPhase} ${modeDirection}`} aria-busy={transitionPhase !== "idle"}>
+          <div className="mode-stage">
             {mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} /> : null}
             {mode === "recall" ? (
               <RecallModule
