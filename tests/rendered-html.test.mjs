@@ -21,7 +21,7 @@ test("server-renders the Current product shell", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Current · Keep your knowledge current<\/title>/i);
-  assert.match(html, /Long-running agent context/);
+  assert.match(html, /Long-running agents/);
   assert.match(html, /What compaction actually preserves/);
   assert.match(html, /Recall/);
   assert.match(html, /Sources/);
@@ -35,6 +35,8 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
   assert.match(source, /sidebar-sources-viewport \$\{sourcesOpen \? "open"/);
+  assert.match(source, /course-sidebar[\s\S]*sidebar-brand[\s\S]*Current/);
+  assert.doesNotMatch(source, /workspace-header|AI agent engineering|Long-running agent context|Concept 2 of 5/);
   assert.match(source, /aria-pressed=\{notebookOpen\}/);
   assert.match(source, /notebook-panel \$\{notebookOpen \? "open".*aria-hidden=\{!notebookOpen\}/s);
   assert.match(source, /className="mode-stage"/);

@@ -161,24 +161,11 @@ export function CurrentWorkspace() {
 
   return (
     <div className={`current-app ${notebookOpen ? "with-notebook" : ""}`}>
-      <header className="workspace-header">
-        <div className="header-left">
-          <button className="icon-action mobile-only" aria-label="Open course outline" onClick={() => setSidebarOpen(true)}><Menu size={18} /></button>
-          <div className="wordmark"><span>Current</span></div>
-          <span className="header-separator" />
-          <span className="track-context">AI agent engineering</span>
-        </div>
-        <div className="header-center"><span className="lesson-name">Long-running agent context</span></div>
-        <div className="header-right">
-          <span className="header-progress">Concept 2 of 5</span>
-        </div>
-      </header>
-
       {sidebarOpen ? <button className="overlay" aria-label="Close course outline" onClick={() => setSidebarOpen(false)} /> : null}
       <button className={`notebook-overlay ${notebookOpen ? "open" : ""}`} aria-label="Close notebook" aria-hidden={!notebookOpen} tabIndex={notebookOpen ? 0 : -1} onClick={() => setNotebookOpen(false)} />
 
       <aside className={`course-sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="sidebar-mobile-head"><span>Course outline</span><button className="icon-action" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button></div>
+        <div className="sidebar-brand"><span>Current</span><button className="icon-action mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button></div>
         <div className="track-title">
           <span className="track-icon"><FolderOpen size={16} /></span>
           <div><strong>Long-running agents</strong><small>OpenAI API · 5 concepts</small></div>
@@ -217,7 +204,10 @@ export function CurrentWorkspace() {
 
       <main className="learning-canvas">
         <div className="lesson-toolbar">
-          <span className="stage-count">Step {modeIndex + 1} of {modeItems.length}</span>
+          <div className="toolbar-start">
+            <button className="icon-action mobile-only" aria-label="Open course outline" onClick={() => setSidebarOpen(true)}><Menu size={18} /></button>
+            <span className="stage-count">Step {modeIndex + 1} of {modeItems.length}</span>
+          </div>
           <div className={"mode-switcher mode-step-" + modeIndex} role="tablist" aria-label="Learning mode">
             {modeItems.map((item) => {
               const Icon = item.icon;
