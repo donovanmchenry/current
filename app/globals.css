@@ -166,13 +166,23 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 }
 .stage-count { color: var(--text-muted); font-size: 11px; }
 .mode-switcher { display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: #1d1d1d; }
-.mode-switcher button { height: 29px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 5px; color: var(--text-muted); background: transparent; font-size: 11px; cursor: pointer; }
+.mode-switcher button { height: 29px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 5px; color: var(--text-muted); background: transparent; font-size: 11px; cursor: pointer; transition: color .18s ease, background .18s ease, box-shadow .18s ease; }
 .mode-switcher button:hover:not(:disabled) { color: var(--text-secondary); }
 .mode-switcher button.active { color: var(--text); background: var(--bg-elevated); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 .mode-switcher button:disabled { opacity: .35; cursor: not-allowed; }
 .notebook-toggle { min-height: 30px; display: inline-flex; align-items: center; justify-self: end; gap: 6px; border: 0; border-radius: 6px; padding: 0 8px; color: var(--text-secondary); background: transparent; font-size: 11px; cursor: pointer; }
 .notebook-toggle:hover, .notebook-toggle.active { color: var(--text); background: var(--bg-hover); }
 .lesson-scroll { position: absolute; inset: 54px 0 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: #555 transparent; }
+.mode-stage { min-height: 100%; }
+.mode-stage.leaving, .mode-stage.entering { pointer-events: none; }
+.mode-stage.leaving.forward { animation: mode-leave-forward .14s ease-in both; }
+.mode-stage.leaving.backward { animation: mode-leave-backward .14s ease-in both; }
+.mode-stage.entering.forward { animation: mode-enter-forward .32s cubic-bezier(.22, 1, .36, 1) both; }
+.mode-stage.entering.backward { animation: mode-enter-backward .32s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes mode-leave-forward { to { opacity: 0; transform: translateX(-12px); } }
+@keyframes mode-leave-backward { to { opacity: 0; transform: translateX(12px); } }
+@keyframes mode-enter-forward { from { opacity: 0; transform: translateX(16px); } }
+@keyframes mode-enter-backward { from { opacity: 0; transform: translateX(-16px); } }
 .lesson-module { width: min(720px, calc(100% - 48px)); margin: 0 auto; padding: 45px 0 60px; }
 .module-header { padding-bottom: 31px; border-bottom: 1px solid var(--line); }
 .module-header.compact-header { padding-bottom: 25px; }

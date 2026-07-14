@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from "react";
 import { scheduleReview } from "../lib/spaced-review";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
+type TransitionPhase = "idle" | "leaving" | "entering";
 
 type Evaluation = {
   score: number;
@@ -82,7 +83,11 @@ export function CurrentWorkspace() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [notebookOpen, setNotebookOpen] = useState(false);
+  const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>("idle");
+  const [modeDirection, setModeDirection] = useState<"forward" | "backward">("forward");
   const hydrated = useRef(false);
+  const lessonScrollRef = useRef<HTMLDivElement>(null);
+  const transitionTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const savedNotes = window.localStorage.getItem("current-notebook-v2") ?? "";
@@ -105,9 +110,37 @@ export function CurrentWorkspace() {
     if (nextReview) window.localStorage.setItem("current-review-v1", nextReview);
   }, [nextReview, notes, reflection]);
 
+  useEffect(() => () => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
+  }, []);
+
   const modeIndex = modeItems.findIndex((item) => item.id === mode);
   const recallComplete = recallPassed || Boolean(nextReview);
   const codePassed = (codeChecked && codeChoice === 1) || Boolean(nextReview);
+
+  const transitionToMode = (nextMode: Mode) => {
+    if (nextMode === mode || transitionPhase !== "idle") return;
+    const nextIndex = modeItems.findIndex((item) => item.id === nextMode);
+    const direction = nextIndex > modeIndex ? "forward" : "backward";
+    setModeDirection(direction);
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      lessonScrollRef.current?.scrollTo({ top: 0 });
+      setMode(nextMode);
+      return;
+    }
+
+    setTransitionPhase("leaving");
+    transitionTimer.current = window.setTimeout(() => {
+      lessonScrollRef.current?.scrollTo({ top: 0 });
+      setMode(nextMode);
+      setTransitionPhase("entering");
+      transitionTimer.current = window.setTimeout(() => {
+        setTransitionPhase("idle");
+        transitionTimer.current = null;
+      }, 320);
+    }, 140);
+  };
 
   const addExcerptToNotes = () => {
     setNotes((value) => value.includes(noteExcerpt) ? value : value ? `${value}\n\n${noteExcerpt}` : noteExcerpt);
@@ -220,9 +253,9 @@ export function CurrentWorkspace() {
                 <button
                   role="tab"
                   aria-selected={mode === item.id}
-                  disabled={locked}
+                  disabled={locked || transitionPhase !== "idle"}
                   className={mode === item.id ? "active" : ""}
-                  onClick={() => setMode(item.id)}
+                  onClick={() => transitionToMode(item.id)}
                   aria-label={locked ? `${item.label} locked` : item.label}
                   title={item.label}
                   key={item.id}
@@ -235,38 +268,40 @@ export function CurrentWorkspace() {
           <button className={`notebook-toggle ${notebookOpen ? "active" : ""}`} aria-label={notebookOpen ? "Close notebook" : "Open notebook"} aria-pressed={notebookOpen} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
         </div>
 
-        <div className="lesson-scroll">
-          {mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); setMode("recall"); }} /> : null}
-          {mode === "recall" ? (
-            <RecallModule
-              answer={recallAnswer}
-              setAnswer={setRecallAnswer}
-              evaluation={evaluation}
-              evaluate={evaluateRecall}
-              isEvaluating={isEvaluating}
-              supportMode={supportMode}
-              setSupportMode={setSupportMode}
-              reset={resetRecall}
-              next={() => setMode("apply")}
-            />
-          ) : null}
-          {mode === "apply" ? (
-            <ApplyModule
-              choice={codeChoice}
-              setChoice={(choice) => { setCodeChoice(choice); setCodeChecked(false); }}
-              checked={codeChecked}
-              check={checkCode}
-              next={() => setMode("reflect")}
-            />
-          ) : null}
-          {mode === "reflect" ? (
-            <ReflectModule
-              reflection={reflection}
-              setReflection={setReflection}
-              nextReview={nextReview}
-              schedule={finishAndSchedule}
-            />
-          ) : null}
+        <div className="lesson-scroll" ref={lessonScrollRef}>
+          <div className={`mode-stage ${transitionPhase} ${modeDirection}`} aria-busy={transitionPhase !== "idle"}>
+            {mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} /> : null}
+            {mode === "recall" ? (
+              <RecallModule
+                answer={recallAnswer}
+                setAnswer={setRecallAnswer}
+                evaluation={evaluation}
+                evaluate={evaluateRecall}
+                isEvaluating={isEvaluating}
+                supportMode={supportMode}
+                setSupportMode={setSupportMode}
+                reset={resetRecall}
+                next={() => transitionToMode("apply")}
+              />
+            ) : null}
+            {mode === "apply" ? (
+              <ApplyModule
+                choice={codeChoice}
+                setChoice={(choice) => { setCodeChoice(choice); setCodeChecked(false); }}
+                checked={codeChecked}
+                check={checkCode}
+                next={() => transitionToMode("reflect")}
+              />
+            ) : null}
+            {mode === "reflect" ? (
+              <ReflectModule
+                reflection={reflection}
+                setReflection={setReflection}
+                nextReview={nextReview}
+                schedule={finishAndSchedule}
+              />
+            ) : null}
+          </div>
         </div>
       </main>
 
