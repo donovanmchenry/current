@@ -53,6 +53,8 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.match(styles, /@font-face[^}]*font-family:\s*"OpenAI Sans"[^}]*OpenAISans-Semibold\.woff2[^}]*font-weight:\s*600/s);
   assert.match(styles, /\.sidebar-brand[^}]*color:\s*var\(--text\)[^}]*font-family:\s*"OpenAI Sans"[^}]*font-size:\s*20px[^}]*font-weight:\s*600/s);
   assert.match(styles, /\.diagram-stage[^}]*border-radius:\s*4px/s);
+  assert.match(styles, /\.diagram-stage\.result[^}]*background:\s*#0d0d0d[^}]*box-shadow:\s*inset 0 0 0 1px hsl\(var\(--primary\) \/ \.38\)/s);
+  assert.match(styles, /\.diagram-stage\.result strong:first-of-type[^}]*background:\s*#2b2b2b[^}]*box-shadow:\s*inset 0 0 0 1px hsl\(var\(--primary\) \/ \.72\)/s);
   assert.match(styles, /\.source-excerpt[^}]*border-radius:\s*4px/s);
   assert.match(styles, /\.code-options button[^}]*border-radius:\s*4px/s);
   assert.doesNotMatch(styles, /\.(?:diagram-stage|source-excerpt|evaluation-result|support-module|code-feedback|scheduled-state)[^}]*border-left/s);
