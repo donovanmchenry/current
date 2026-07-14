@@ -102,25 +102,32 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .sidebar-bottom button small { color: var(--text-muted); }
 .sidebar-bottom button > svg:last-child { transition: transform .42s cubic-bezier(.22, 1, .36, 1); }
 .sidebar-bottom button > svg:last-child.expanded { transform: rotate(180deg); }
-.sidebar-sources-drawer {
+.sidebar-sources-viewport {
   position: absolute;
   right: 0;
   bottom: 42px;
   left: 0;
+  height: 220px;
   z-index: 1;
+  overflow: hidden;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(calc(100% + 42px));
-  transition:
-    transform .42s cubic-bezier(.22, 1, .36, 1),
-    visibility 0s linear .42s;
+  transition: visibility 0s linear .42s;
 }
-.sidebar-sources-drawer.open {
+.sidebar-sources-viewport.open {
   visibility: visible;
   pointer-events: auto;
-  transform: translateY(0);
   transition-delay: 0s;
 }
+.sidebar-sources-drawer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateY(100%);
+  transition: transform .42s cubic-bezier(.22, 1, .36, 1);
+}
+.sidebar-sources-viewport.open .sidebar-sources-drawer { transform: translateY(0); }
 .sidebar-sources { padding: 10px 7px; border-top: 1px solid var(--line-soft); background: var(--bg-deep); }
 .sidebar-sources-heading { padding: 5px 3px 9px; }
 .sidebar-sources-heading span, .sidebar-sources-heading small { display: block; }

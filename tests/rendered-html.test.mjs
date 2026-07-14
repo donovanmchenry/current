@@ -32,7 +32,7 @@ test("server-renders the Current product shell", async () => {
 test("keeps sources in the course sidebar and the notebook notes-only", async () => {
   const source = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /sidebar-sources-drawer \$\{sourcesOpen \? "open"/);
+  assert.match(source, /sidebar-sources-viewport \$\{sourcesOpen \? "open"/);
   assert.match(source, /aria-pressed=\{notebookOpen\}/);
   assert.doesNotMatch(source, /RightTab|rightTab|sources-pane|notebook-tabs|notebook-heading|PanelLeftClose|className="close-notebook"/);
 });
