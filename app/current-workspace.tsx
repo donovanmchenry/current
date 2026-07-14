@@ -17,7 +17,6 @@ import {
   ListChecks,
   Menu,
   NotebookPen,
-  PanelLeftClose,
   Play,
   RotateCcw,
   Send,
@@ -192,18 +191,16 @@ export function CurrentWorkspace() {
         </ol>
 
         <div className="sidebar-bottom">
-          {sourcesOpen ? (
-            <div className="sidebar-sources">
-              <div className="sidebar-sources-heading"><span>Official sources</span><small>For this concept</small></div>
-              {sources.map((source) => (
-                <a href={source.href} target="_blank" rel="noreferrer" className="sidebar-source-item" key={source.title}>
-                  <FileText size={14} />
-                  <span><strong>{source.title}</strong><small>{source.detail}</small></span>
-                  <ExternalLink size={12} />
-                </a>
-              ))}
-            </div>
-          ) : null}
+          <div className={`sidebar-sources ${sourcesOpen ? "open" : ""}`} aria-hidden={!sourcesOpen}>
+            <div className="sidebar-sources-heading"><span>Official sources</span><small>For this concept</small></div>
+            {sources.map((source) => (
+              <a href={source.href} target="_blank" rel="noreferrer" tabIndex={sourcesOpen ? 0 : -1} className="sidebar-source-item" key={source.title}>
+                <FileText size={14} />
+                <span><strong>{source.title}</strong><small>{source.detail}</small></span>
+                <ExternalLink size={12} />
+              </a>
+            ))}
+          </div>
           <button aria-expanded={sourcesOpen} onClick={() => setSourcesOpen((value) => !value)}><FileText size={15} /><span>Sources</span><small>{sources.length}</small><ChevronDown className={sourcesOpen ? "expanded" : ""} size={14} /></button>
         </div>
       </aside>
@@ -231,7 +228,7 @@ export function CurrentWorkspace() {
               );
             })}
           </div>
-          <button className="notebook-toggle" aria-label={notebookOpen ? "Close notebook" : "Open notebook"} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
+          <button className={`notebook-toggle ${notebookOpen ? "active" : ""}`} aria-label={notebookOpen ? "Close notebook" : "Open notebook"} aria-pressed={notebookOpen} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
         </div>
 
         <div className="lesson-scroll">
@@ -270,11 +267,6 @@ export function CurrentWorkspace() {
       </main>
 
       <aside className={`notebook-panel ${notebookOpen ? "open" : ""}`}>
-        <div className="notebook-heading">
-          <span><NotebookPen size={14} /> Notes</span>
-          <button className="close-notebook" aria-label="Close notebook" onClick={() => setNotebookOpen(false)}><PanelLeftClose size={16} /></button>
-        </div>
-
         <div className="notes-pane">
           <div className="note-document-title">
             <div><span>Compaction notes</span><small>Saved on this device</small></div>
