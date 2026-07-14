@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render(path = "/") {
@@ -26,6 +27,14 @@ test("server-renders the Current product shell", async () => {
   assert.match(html, /Sources/);
   assert.doesNotMatch(html, /Good afternoon|day streak|Agent trail|New learning track|Make recall prompt|Change the practice|How this track adapts/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
+});
+
+test("keeps sources in the course sidebar and the notebook notes-only", async () => {
+  const source = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /className="sidebar-sources"/);
+  assert.match(source, /className="notebook-heading"/);
+  assert.doesNotMatch(source, /RightTab|rightTab|sources-pane|notebook-tabs/);
 });
 
 test("returns a deterministic evaluation when no API key is configured", async () => {

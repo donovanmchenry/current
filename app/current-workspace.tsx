@@ -6,6 +6,7 @@ import {
   Brain,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   CircleHelp,
   Code2,
@@ -26,7 +27,6 @@ import { useEffect, useRef, useState } from "react";
 import { scheduleReview } from "../lib/spaced-review";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
-type RightTab = "notes" | "sources";
 
 type Evaluation = {
   score: number;
@@ -40,13 +40,11 @@ type Evaluation = {
 const sources = [
   {
     title: "Compaction",
-    domain: "OpenAI API docs",
     detail: "Server-side and standalone compaction",
     href: "https://developers.openai.com/api/docs/guides/compaction",
   },
   {
     title: "Conversation state",
-    domain: "OpenAI API docs",
     detail: "Responses, conversations, and chaining",
     href: "https://developers.openai.com/api/docs/guides/conversation-state",
   },
@@ -71,7 +69,6 @@ const noteExcerpt = "Compaction preserves key prior state in an opaque item whil
 
 export function CurrentWorkspace() {
   const [mode, setMode] = useState<Mode>("read");
-  const [rightTab, setRightTab] = useState<RightTab>("notes");
   const [notes, setNotes] = useState("");
   const [recallAnswer, setRecallAnswer] = useState("");
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
@@ -84,6 +81,7 @@ export function CurrentWorkspace() {
   const [nextReview, setNextReview] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [notebookOpen, setNotebookOpen] = useState(false);
   const hydrated = useRef(false);
 
@@ -115,7 +113,6 @@ export function CurrentWorkspace() {
   const addExcerptToNotes = () => {
     setNotes((value) => value.includes(noteExcerpt) ? value : value ? `${value}\n\n${noteExcerpt}` : noteExcerpt);
     setHighlighted(true);
-    setRightTab("notes");
     setNotebookOpen(true);
   };
 
@@ -195,7 +192,19 @@ export function CurrentWorkspace() {
         </ol>
 
         <div className="sidebar-bottom">
-          <button onClick={() => { setRightTab("sources"); setNotebookOpen(true); }}><FileText size={15} /><span>Sources</span><small>{sources.length}</small></button>
+          {sourcesOpen ? (
+            <div className="sidebar-sources">
+              <div className="sidebar-sources-heading"><span>Official sources</span><small>For this concept</small></div>
+              {sources.map((source) => (
+                <a href={source.href} target="_blank" rel="noreferrer" className="sidebar-source-item" key={source.title}>
+                  <FileText size={14} />
+                  <span><strong>{source.title}</strong><small>{source.detail}</small></span>
+                  <ExternalLink size={12} />
+                </a>
+              ))}
+            </div>
+          ) : null}
+          <button aria-expanded={sourcesOpen} onClick={() => setSourcesOpen((value) => !value)}><FileText size={15} /><span>Sources</span><small>{sources.length}</small><ChevronDown className={sourcesOpen ? "expanded" : ""} size={14} /></button>
         </div>
       </aside>
 
@@ -261,40 +270,26 @@ export function CurrentWorkspace() {
       </main>
 
       <aside className={`notebook-panel ${notebookOpen ? "open" : ""}`}>
-        <div className="notebook-tabs" role="tablist">
-          <button role="tab" aria-selected={rightTab === "notes"} className={rightTab === "notes" ? "active" : ""} onClick={() => setRightTab("notes")}><NotebookPen size={14} /> Notes</button>
-          <button role="tab" aria-selected={rightTab === "sources"} className={rightTab === "sources" ? "active" : ""} onClick={() => setRightTab("sources")}><FileText size={14} /> Sources <span>{sources.length}</span></button>
+        <div className="notebook-heading">
+          <span><NotebookPen size={14} /> Notes</span>
           <button className="close-notebook" aria-label="Close notebook" onClick={() => setNotebookOpen(false)}><PanelLeftClose size={16} /></button>
         </div>
 
-        {rightTab === "notes" ? (
-          <div className="notes-pane">
-            <div className="note-document-title">
-              <div><span>Compaction notes</span><small>Saved on this device</small></div>
-            </div>
-            <textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder={"Write while you learn…\n\nTry explaining the purpose of compaction without copying the source."}
-              aria-label="Learning notes"
-            />
-            <div className="note-footer">
-              <span>{notes.trim() ? `${notes.trim().split(/\s+/).length} words` : "0 words"}</span>
-              <span>Autosaved</span>
-            </div>
+        <div className="notes-pane">
+          <div className="note-document-title">
+            <div><span>Compaction notes</span><small>Saved on this device</small></div>
           </div>
-        ) : (
-          <div className="sources-pane">
-            <div className="source-pane-heading"><span>Official sources</span><small>Used for this lesson</small></div>
-            {sources.map((source, index) => (
-              <a href={source.href} target="_blank" rel="noreferrer" className="source-item" key={source.title}>
-                <span className="source-number">0{index + 1}</span>
-                <div><strong>{source.title}</strong><span>{source.domain}</span><small>{source.detail}</small></div>
-                <ExternalLink size={13} />
-              </a>
-            ))}
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder={"Write while you learn…\n\nTry explaining the purpose of compaction without copying the source."}
+            aria-label="Learning notes"
+          />
+          <div className="note-footer">
+            <span>{notes.trim() ? `${notes.trim().split(/\s+/).length} words` : "0 words"}</span>
+            <span>Autosaved</span>
           </div>
-        )}
+        </div>
       </aside>
     </div>
   );
