@@ -14,7 +14,6 @@ import {
   FolderOpen,
   Link2,
   List,
-  Menu,
   Network,
   Plus,
   RotateCcw,
@@ -123,14 +122,14 @@ const mapStorageKey = "current-learning-map-v1";
 const nodeTypes = { learning: LearningGraphNode } satisfies NodeTypes;
 
 type LearningMapProps = {
-  onOpenLesson: () => void;
-  onOpenSidebar: () => void;
+  onOpenLesson: (conceptIndex?: number) => void;
   onApplyResearchUpdate: () => void;
 };
 
-export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate }: LearningMapProps) {
+export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMapProps) {
   const [mapMode, setMapMode] = useState<MapMode>("map");
   const [selectedPathId, setSelectedPathId] = useState("long-running");
+  const [selectedConceptIndex, setSelectedConceptIndex] = useState(1);
   const [proposalStatus, setProposalStatus] = useState<ProposalStatus>("ready");
   const [suggestionStatus, setSuggestionStatus] = useState<SuggestionStatus>("ready");
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -147,6 +146,11 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
     [customPaths, suggestionStatus],
   );
   const selectedPath = paths.find((path) => path.id === selectedPathId) ?? paths[0];
+  const nextConceptIndex = getNextConceptIndex(selectedPath);
+  const inspectedConceptIndex = Math.min(selectedConceptIndex, selectedPath.concepts.length - 1);
+  const inspectedConcept = selectedPath.concepts[inspectedConceptIndex];
+  const inspectedConceptState = inspectedConceptIndex < nextConceptIndex ? "done" : inspectedConceptIndex === nextConceptIndex ? "current" : "upcoming";
+  const inspectedConceptLabel = inspectedConceptState === "done" ? "Completed" : inspectedConceptState === "current" ? (selectedPath.id === "long-running" ? "Current" : "Next") : "Upcoming";
   const plannedPath = paths.find((path) => path.id === plannedPathId);
   const pendingUpdates = Number(proposalStatus === "ready") + Number(suggestionStatus === "ready");
   const nodes = useMemo(
@@ -204,28 +208,36 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
 
   const selectPath = (pathId: string) => {
     setSelectedPathId(pathId);
+    const path = paths.find((item) => item.id === pathId);
+    if (path) setSelectedConceptIndex(getNextConceptIndex(path));
   };
 
   const addSuggestedPath = () => {
     setSuggestionStatus("added");
     setSelectedPathId(suggestedPath.id);
+    setSelectedConceptIndex(0);
   };
 
   const dismissSuggestion = () => {
     setSuggestionStatus("dismissed");
-    if (selectedPathId === suggestedPath.id) setSelectedPathId("long-running");
+    if (selectedPathId === suggestedPath.id) {
+      setSelectedPathId("long-running");
+      setSelectedConceptIndex(1);
+    }
   };
 
   const applyProposal = () => {
     setProposalStatus("applied");
     setReviewOpen(false);
     setSelectedPathId("long-running");
+    setSelectedConceptIndex(1);
     onApplyResearchUpdate();
   };
 
   const addCustomPath = (path: LearningPath) => {
     setCustomPaths((current) => [...current, path]);
     setSelectedPathId(path.id);
+    setSelectedConceptIndex(0);
     setMapMode("map");
     setCreatePathOpen(false);
   };
@@ -233,6 +245,7 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
   const removeCustomPath = (pathId: string) => {
     setCustomPaths((current) => current.filter((path) => path.id !== pathId));
     setSelectedPathId("long-running");
+    setSelectedConceptIndex(1);
     setPlannedPathId((current) => current === pathId ? null : current);
     setRemovePathId(null);
   };
@@ -241,9 +254,13 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
     <section className="learning-map-shell" aria-label="Learning map">
       <div className="map-toolbar">
         <div className="map-toolbar-start">
-          <button className="icon-action mobile-only" aria-label="Open course outline" onClick={onOpenSidebar}><Menu size={18} /></button>
-          <Network size={15} />
-          <span>Learning map</span>
+          <span className="map-wordmark">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/current-icon.svg" width="18" height="18" alt="" aria-hidden="true" />
+            <strong>Current</strong>
+          </span>
+          <span className="map-toolbar-divider" aria-hidden="true" />
+          <span className="map-toolbar-title"><Network size={15} /><span>Learning map</span></span>
         </div>
         <div className="map-view-switcher" role="tablist" aria-label="Learning map view">
           <button role="tab" aria-selected={mapMode === "map"} className={mapMode === "map" ? "active" : ""} onClick={() => setMapMode("map")}><Network size={14} /> Map</button>
@@ -251,7 +268,7 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
         </div>
         <div className="map-toolbar-actions">
           <button className="create-path-button" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={14} /><span>New path</span></button>
-          <button className="map-return-button" aria-label="Continue lesson" onClick={onOpenLesson}><ArrowLeft size={14} /><span>Continue lesson</span></button>
+          <button className="map-return-button" aria-label="Continue lesson" onClick={() => onOpenLesson()}><ArrowLeft size={14} /><span>Continue lesson</span></button>
         </div>
       </div>
 
@@ -302,16 +319,28 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
             <p>{selectedPath.description}</p>
             <div className="selected-path-progress"><span><i style={{ width: `${selectedPath.progress}%` }} /></span><small>{selectedPath.progress}% mastered</small></div>
             <div className="selected-path-next"><Clock3 size={13} /><span>Next</span><strong>{selectedPath.next}</strong></div>
-            {selectedPath.userCreated ? (
-              <div className="selected-path-outline">
-                <span>Concepts</span>
-                <ol>
-                  {selectedPath.concepts.map((concept, index) => (
-                    <li key={`${selectedPath.id}-${concept.title}`}><span>{index + 1}</span><div><strong>{concept.title}</strong><p>{concept.objective}</p></div></li>
-                  ))}
-                </ol>
+            <div className="selected-path-outline">
+              <div className="selected-path-outline-heading"><span>Concepts</span><small>{inspectedConceptIndex + 1} of {selectedPath.concepts.length}</small></div>
+              <ol>
+                {selectedPath.concepts.map((concept, index) => {
+                  const conceptState = index < nextConceptIndex ? "done" : index === nextConceptIndex ? "current" : "upcoming";
+                  const conceptLabel = conceptState === "done" ? "Completed" : conceptState === "current" ? (selectedPath.id === "long-running" ? "Current" : "Next") : "Upcoming";
+                  return (
+                    <li className={`${conceptState} ${inspectedConceptIndex === index ? "selected" : ""}`} key={`${selectedPath.id}-${concept.title}`}>
+                      <button aria-pressed={inspectedConceptIndex === index} onClick={() => setSelectedConceptIndex(index)}>
+                        <span>{conceptState === "done" ? <Check size={10} /> : index + 1}</span>
+                        <div><strong>{concept.title}</strong><small>{conceptLabel}</small></div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+              <div className="selected-concept-detail">
+                <span>{inspectedConceptLabel}</span>
+                <strong>{inspectedConcept.title}</strong>
+                <p>{inspectedConcept.objective}</p>
               </div>
-            ) : null}
+            </div>
             {selectedPath.userCreated && selectedPath.sources?.length ? (
               <div className="selected-path-sources">
                 <span>Sources</span>
@@ -326,7 +355,7 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
               </div>
             ) : null}
             {selectedPath.id === "long-running" ? (
-              <button className="rail-primary-action" onClick={onOpenLesson}><BookOpen size={14} /> Continue Compaction</button>
+              <button className="rail-primary-action" onClick={() => onOpenLesson(inspectedConceptIndex)}><BookOpen size={14} /> {inspectedConceptState === "done" ? "Review" : inspectedConceptState === "current" ? "Continue" : "Preview"} {inspectedConcept.title}</button>
             ) : (
               <button className="rail-primary-action" onClick={() => setPlannedPathId((current) => current === selectedPath.id ? null : selectedPath.id)}><Clock3 size={14} />{plannedPathId === selectedPath.id ? "Remove from queue" : "Set as next"}</button>
             )}
@@ -476,6 +505,11 @@ function createEdges(paths: LearningPath[]): Edge[] {
     edges.push({ id: `related-${path.id}`, source: `path-${path.relatedPathId}`, sourceHandle: "bottom", target: `path-${path.id}`, targetHandle: "top", label: "related", type: "smoothstep", className: "learning-edge suggested" });
   }
   return edges;
+}
+
+function getNextConceptIndex(path: LearningPath) {
+  const index = path.concepts.findIndex((concept) => concept.title === path.next);
+  return index >= 0 ? index : 0;
 }
 
 function isStoredLearningPath(value: unknown): value is LearningPath {

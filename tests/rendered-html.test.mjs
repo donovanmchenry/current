@@ -95,6 +95,10 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /setWorkspaceView\("map"\)/);
   assert.match(workspace, /<LearningMap[\s\S]*onOpenLesson=\{openLesson\}/);
   assert.match(workspace, /onApplyResearchUpdate=\{finishAndSchedule\}/);
+  assert.match(workspace, /workspaceView === "map" \? "map-view"/);
+  assert.match(workspace, /className="concept-row"[\s\S]*onClick=\{\(\) => openLesson\(index\)\}/);
+  assert.match(workspace, /<ConceptOverview concept=\{activeConcept\} index=\{activeConceptIndex\}/);
+  assert.match(workspace, /activeSources\.map\(\(source\)/);
   assert.match(map, /<ReactFlow[\s\S]*nodes=\{nodes\}[\s\S]*edges=\{edges\}/);
   assert.match(map, /role="tablist" aria-label="Learning map view"/);
   assert.match(map, /setProposalStatus\("applied"\)/);
@@ -108,7 +112,12 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /current-learning-map-v1/);
   assert.match(map, /window\.localStorage\.setItem\(mapStorageKey/);
   assert.match(map, /mapBodyRef\.current\?\.scrollTo\(\{ top: 0 \}\)/);
+  assert.match(map, /setSelectedConceptIndex\(index\)/);
+  assert.match(map, /aria-pressed=\{inspectedConceptIndex === index\}/);
+  assert.match(map, /Review" : inspectedConceptState === "current" \? "Continue" : "Preview"/);
   assert.doesNotMatch(map, /Checking official sources|Running now|3 agents|Research active|id: "concept-/);
+  assert.match(styles, /\.current-app\.map-view \.course-sidebar[^}]*display:\s*none/s);
+  assert.match(styles, /\.concept-row[^}]*cursor:\s*pointer/s);
   assert.match(styles, /\.learning-map-body[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 316px/s);
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.learning-map-body[^}]*display:\s*block[^}]*overflow-y:\s*auto/s);

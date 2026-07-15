@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowLeft,
   ArrowRight,
   BookOpen,
   Brain,
@@ -28,6 +29,16 @@ import { LearningMap } from "./learning-map";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
 type WorkspaceView = "lesson" | "map";
+type ConceptStatus = "done" | "current" | "next" | "locked";
+
+type CourseConcept = {
+  label: string;
+  status: ConceptStatus;
+  objective: string;
+  summary: string;
+  checkpoints: string[];
+  sourceIds: string[];
+};
 
 type Evaluation = {
   score: number;
@@ -40,23 +51,60 @@ type Evaluation = {
 
 const sources = [
   {
+    id: "compaction",
     title: "Compaction",
     detail: "Server-side and standalone compaction",
     href: "https://developers.openai.com/api/docs/guides/compaction",
   },
   {
+    id: "conversation-state",
     title: "Conversation state",
     detail: "Responses, conversations, and chaining",
     href: "https://developers.openai.com/api/docs/guides/conversation-state",
   },
 ];
 
-const concepts = [
-  { label: "Conversation state", status: "done" },
-  { label: "Compaction", status: "current" },
-  { label: "Stateless chaining", status: "next" },
-  { label: "Recovery patterns", status: "locked" },
-  { label: "Implementation check", status: "locked" },
+const concepts: CourseConcept[] = [
+  {
+    label: "Conversation state",
+    status: "done",
+    objective: "Explain which state belongs to a response, a conversation, and your application.",
+    summary: "Long-running work depends on knowing where continuity lives. Responses can be chained directly, attached to a durable conversation, or carried forward by your application.",
+    checkpoints: ["Response objects and output items", "Durable conversation identifiers", "Application-owned state boundaries"],
+    sourceIds: ["conversation-state"],
+  },
+  {
+    label: "Compaction",
+    status: "current",
+    objective: "Explain when compaction runs and what its opaque item preserves.",
+    summary: "Compaction reduces accumulated context while preserving the state and reasoning needed to continue later turns.",
+    checkpoints: ["Rendered-token thresholds", "Opaque compact items", "The next request after compaction"],
+    sourceIds: ["compaction", "conversation-state"],
+  },
+  {
+    label: "Stateless chaining",
+    status: "next",
+    objective: "Choose what the next request must contain when the application does not keep a conversation object.",
+    summary: "Stateless chaining keeps continuity explicit. The application either appends prior response output to the next input or carries a previous response ID forward.",
+    checkpoints: ["Input-array chaining", "Using previous_response_id", "Avoiding duplicate or pruned state"],
+    sourceIds: ["conversation-state", "compaction"],
+  },
+  {
+    label: "Recovery patterns",
+    status: "locked",
+    objective: "Recover an interrupted agent without replaying unnecessary context or duplicating work.",
+    summary: "Recovery starts from the last trustworthy state boundary, then resumes with enough context to continue without repeating completed tool actions.",
+    checkpoints: ["Durable checkpoints", "Idempotent tool execution", "Resuming from the last valid response"],
+    sourceIds: ["conversation-state"],
+  },
+  {
+    label: "Implementation check",
+    status: "locked",
+    objective: "Configure, run, and verify compaction inside a working agent loop.",
+    summary: "The final concept combines context policy, chaining, and recovery into one implementation that can be inspected and tested.",
+    checkpoints: ["Compaction configuration", "Request-chain verification", "Failure and recovery test cases"],
+    sourceIds: ["compaction", "conversation-state"],
+  },
 ];
 
 const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
@@ -70,6 +118,7 @@ const noteExcerpt = "Compaction preserves key prior state in an opaque item whil
 
 export function CurrentWorkspace() {
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("lesson");
+  const [activeConceptIndex, setActiveConceptIndex] = useState(1);
   const [mode, setMode] = useState<Mode>("read");
   const [notes, setNotes] = useState("");
   const [recallAnswer, setRecallAnswer] = useState("");
@@ -112,6 +161,9 @@ export function CurrentWorkspace() {
   const modeIndex = modeItems.findIndex((item) => item.id === mode);
   const recallComplete = recallPassed || Boolean(nextReview);
   const codePassed = (codeChecked && codeChoice === 1) || Boolean(nextReview);
+  const activeConcept = concepts[activeConceptIndex] ?? concepts[1];
+  const activeSources = sources.filter((source) => activeConcept.sourceIds.includes(source.id));
+  const isCurrentConcept = activeConceptIndex === 1;
 
   const transitionToMode = (nextMode: Mode) => {
     if (nextMode === mode) return;
@@ -169,13 +221,19 @@ export function CurrentWorkspace() {
     setWorkspaceView("map");
   };
 
-  const openLesson = () => {
+  const openLesson = (conceptIndex = activeConceptIndex) => {
+    const nextConceptIndex = Math.max(0, Math.min(concepts.length - 1, conceptIndex));
+    setActiveConceptIndex(nextConceptIndex);
+    setMode("read");
+    setSourcesOpen(false);
+    if (nextConceptIndex !== 1) setNotebookOpen(false);
     setSidebarOpen(false);
     setWorkspaceView("lesson");
+    window.requestAnimationFrame(() => lessonScrollRef.current?.scrollTo({ top: 0 }));
   };
 
   return (
-    <div className={`current-app ${notebookOpen ? "with-notebook" : ""}`}>
+    <div className={`current-app ${workspaceView === "map" ? "map-view" : ""} ${notebookOpen ? "with-notebook" : ""}`}>
       {sidebarOpen ? <button className="overlay" aria-label="Close course outline" onClick={() => setSidebarOpen(false)} /> : null}
       <button className={`notebook-overlay ${notebookOpen ? "open" : ""}`} aria-label="Close notebook" aria-hidden={!notebookOpen} tabIndex={notebookOpen ? 0 : -1} onClick={() => setNotebookOpen(false)} />
 
@@ -196,12 +254,12 @@ export function CurrentWorkspace() {
 
         <ol className="concept-path">
           {concepts.map((concept, index) => (
-            <li className={concept.status} key={concept.label}>
-              <div className="concept-row">
+            <li className={`${concept.status} ${activeConceptIndex === index ? "selected" : ""}`} key={concept.label}>
+              <button className="concept-row" aria-current={activeConceptIndex === index ? "page" : undefined} onClick={() => openLesson(index)}>
                 <span className="concept-state">{concept.status === "done" ? <Check size={11} /> : index + 1}</span>
                 <span>{concept.label}</span>
                 {concept.status === "current" ? <span className="now-label">Now</span> : null}
-              </div>
+              </button>
             </li>
           ))}
         </ol>
@@ -211,7 +269,7 @@ export function CurrentWorkspace() {
             <div className="sidebar-sources-drawer">
               <div className="sidebar-sources">
                 <div className="sidebar-sources-heading"><span>Official sources</span><small>For this concept</small></div>
-                {sources.map((source) => (
+                {activeSources.map((source) => (
                   <a href={source.href} target="_blank" rel="noreferrer" tabIndex={sourcesOpen ? 0 : -1} className="sidebar-source-item" key={source.title}>
                     <FileText size={14} />
                     <span><strong>{source.title}</strong><small>{source.detail}</small></span>
@@ -221,7 +279,7 @@ export function CurrentWorkspace() {
               </div>
             </div>
           </div>
-          <button aria-expanded={sourcesOpen} onClick={() => setSourcesOpen((value) => !value)}><FileText size={15} /><span>Sources</span><small>{sources.length}</small><ChevronDown className={sourcesOpen ? "expanded" : ""} size={14} /></button>
+          <button aria-expanded={sourcesOpen} onClick={() => setSourcesOpen((value) => !value)}><FileText size={15} /><span>Sources</span><small>{activeSources.length}</small><ChevronDown className={sourcesOpen ? "expanded" : ""} size={14} /></button>
         </div>
       </aside>
 
@@ -229,7 +287,6 @@ export function CurrentWorkspace() {
         {workspaceView === "map" ? (
           <LearningMap
             onOpenLesson={openLesson}
-            onOpenSidebar={() => setSidebarOpen(true)}
             onApplyResearchUpdate={finishAndSchedule}
           />
         ) : (
@@ -237,35 +294,42 @@ export function CurrentWorkspace() {
             <div className="lesson-toolbar">
               <div className="toolbar-start">
                 <button className="icon-action mobile-only" aria-label="Open course outline" onClick={() => setSidebarOpen(true)}><Menu size={18} /></button>
-                <span className="stage-count">Step {modeIndex + 1} of {modeItems.length}</span>
+                <span className="stage-count">{isCurrentConcept ? `Step ${modeIndex + 1} of ${modeItems.length}` : `Concept ${activeConceptIndex + 1} of ${concepts.length}`}</span>
               </div>
-              <div className={"mode-switcher mode-step-" + modeIndex} role="tablist" aria-label="Learning mode">
-                {modeItems.map((item) => {
-                  const Icon = item.icon;
-                  const locked = (item.id === "apply" && !recallComplete) || (item.id === "reflect" && !codePassed);
-                  return (
-                    <button
-                      role="tab"
-                      aria-selected={mode === item.id}
-                      disabled={locked}
-                      className={mode === item.id ? "active" : ""}
-                      onClick={() => transitionToMode(item.id)}
-                      aria-label={locked ? `${item.label} locked` : item.label}
-                      title={item.label}
-                      key={item.id}
-                    >
-                      <Icon size={14} />{item.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <button className={`notebook-toggle ${notebookOpen ? "active" : ""}`} aria-label={notebookOpen ? "Close notebook" : "Open notebook"} aria-pressed={notebookOpen} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
+              {isCurrentConcept ? (
+                <div className={"mode-switcher mode-step-" + modeIndex} role="tablist" aria-label="Learning mode">
+                  {modeItems.map((item) => {
+                    const Icon = item.icon;
+                    const locked = (item.id === "apply" && !recallComplete) || (item.id === "reflect" && !codePassed);
+                    return (
+                      <button
+                        role="tab"
+                        aria-selected={mode === item.id}
+                        disabled={locked}
+                        className={mode === item.id ? "active" : ""}
+                        onClick={() => transitionToMode(item.id)}
+                        aria-label={locked ? `${item.label} locked` : item.label}
+                        title={item.label}
+                        key={item.id}
+                      >
+                        <Icon size={14} />{item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : <span className="concept-toolbar-title">{activeConcept.label}</span>}
+              {isCurrentConcept ? (
+                <button className={`notebook-toggle ${notebookOpen ? "active" : ""}`} aria-label={notebookOpen ? "Close notebook" : "Open notebook"} aria-pressed={notebookOpen} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
+              ) : (
+                <button className="notebook-toggle" onClick={() => openLesson(1)}><ArrowLeft size={14} /><span>Current concept</span></button>
+              )}
             </div>
 
             <div className="lesson-scroll" ref={lessonScrollRef}>
               <div className="mode-stage">
-                {mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} /> : null}
-                {mode === "recall" ? (
+                {!isCurrentConcept ? <ConceptOverview concept={activeConcept} index={activeConceptIndex} /> : null}
+                {isCurrentConcept && mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} /> : null}
+                {isCurrentConcept && mode === "recall" ? (
                   <RecallModule
                     answer={recallAnswer}
                     setAnswer={setRecallAnswer}
@@ -278,7 +342,7 @@ export function CurrentWorkspace() {
                     next={() => transitionToMode("apply")}
                   />
                 ) : null}
-                {mode === "apply" ? (
+                {isCurrentConcept && mode === "apply" ? (
                   <ApplyModule
                     choice={codeChoice}
                     setChoice={(choice) => { setCodeChoice(choice); setCodeChecked(false); }}
@@ -287,7 +351,7 @@ export function CurrentWorkspace() {
                     next={() => transitionToMode("reflect")}
                   />
                 ) : null}
-                {mode === "reflect" ? (
+                {isCurrentConcept && mode === "reflect" ? (
                   <ReflectModule
                     reflection={reflection}
                     setReflection={setReflection}
@@ -320,6 +384,32 @@ export function CurrentWorkspace() {
         </div>
       </aside>
     </div>
+  );
+}
+
+function ConceptOverview({ concept, index }: { concept: CourseConcept; index: number }) {
+  const statusLabel = concept.status === "done" ? "Completed" : concept.status === "next" ? "Up next" : "Later in this path";
+
+  return (
+    <article className="lesson-module concept-overview-module">
+      <header className="module-header">
+        <div className="concept-overview-meta"><span>{statusLabel}</span><span>Concept {index + 1} of {concepts.length}</span></div>
+        <h1>{concept.label}</h1>
+        <p>{concept.summary}</p>
+      </header>
+      <section className="concept-overview-objective">
+        <span>Learning objective</span>
+        <p>{concept.objective}</p>
+      </section>
+      <section className="concept-overview-checkpoints">
+        <h2>What connects here</h2>
+        <ol>
+          {concept.checkpoints.map((checkpoint, checkpointIndex) => (
+            <li key={checkpoint}><span>{checkpointIndex + 1}</span><strong>{checkpoint}</strong></li>
+          ))}
+        </ol>
+      </section>
+    </article>
   );
 }
 
