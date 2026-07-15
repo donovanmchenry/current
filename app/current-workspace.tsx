@@ -301,11 +301,6 @@ export function CurrentWorkspace() {
     window.requestAnimationFrame(() => lessonScrollRef.current?.scrollTo({ top: 0 }));
   };
 
-  const continueLesson = () => {
-    const current = progressForPath(activePath, progress[activePath.id]);
-    openLesson(activePath.id, current.currentConceptIndex);
-  };
-
   const startReview = (review: ReviewItem) => {
     openLesson(review.pathId, review.conceptIndex, "recall");
     setActiveReviewId(review.id);
@@ -423,7 +418,6 @@ export function CurrentWorkspace() {
             progress={progress}
             reviews={reviews}
             suggestedPathAdded={suggestedPathAdded}
-            onContinueLesson={continueLesson}
             onOpenLesson={openLesson}
             onQueuePath={toggleQueue}
             onAddCustomPath={addCustomPath}

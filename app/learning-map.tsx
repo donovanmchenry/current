@@ -2,7 +2,6 @@
 
 import {
   Activity,
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   CalendarClock,
@@ -68,7 +67,6 @@ type LearningMapProps = {
   progress: Record<string, PathProgress>;
   reviews: ReviewItem[];
   suggestedPathAdded: boolean;
-  onContinueLesson: () => void;
   onOpenLesson: (pathId: string, conceptIndex: number) => void;
   onQueuePath: (pathId: string) => void;
   onAddCustomPath: (path: LearningPath) => void;
@@ -85,7 +83,6 @@ export function LearningMap({
   progress,
   reviews,
   suggestedPathAdded,
-  onContinueLesson,
   onOpenLesson,
   onQueuePath,
   onAddCustomPath,
@@ -213,7 +210,7 @@ export function LearningMap({
   };
 
   return (
-    <section className="learning-map-shell" aria-label="Learning map">
+    <section className={`learning-map-shell ${mapMode === "updates" ? "updates-view" : ""}`} aria-label="Learning map">
       <div className="map-toolbar">
         <div className="map-toolbar-start">
           <span className="map-wordmark">
@@ -231,7 +228,6 @@ export function LearningMap({
         </div>
         <div className="map-toolbar-actions">
           <button className="create-path-button" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={14} /><span>New path</span></button>
-          <button className="map-return-button" aria-label="Continue lesson" onClick={onContinueLesson}><ArrowLeft size={14} /><span>Continue lesson</span></button>
         </div>
       </div>
 

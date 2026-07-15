@@ -119,6 +119,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /Remove from queue/);
   assert.match(map, /New path/);
   assert.match(map, /<CreatePathDialog/);
+  assert.doesNotMatch(map, /map-return-button|Continue lesson/);
   assert.doesNotMatch(map, /const \[customPaths|const \[plannedPathId/);
   assert.match(map, /mapBodyRef\.current\?\.scrollTo\(\{ top: 0 \}\)/);
   assert.match(map, /setSelectedConceptIndex\(index\)/);
@@ -135,7 +136,9 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.doesNotMatch(map, /Checking official sources|Running now|3 agents|Research active|id: "concept-/);
   assert.match(styles, /\.current-app\.map-view \.course-sidebar[^}]*display:\s*none/s);
   assert.match(styles, /\.concept-row[^}]*cursor:\s*pointer/s);
-  assert.match(styles, /\.learning-map-body[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 316px/s);
+  assert.match(styles, /\.learning-map-shell[^}]*grid-template-columns:\s*minmax\(0, 1fr\) var\(--map-rail\)/s);
+  assert.match(styles, /\.map-toolbar[^}]*grid-column:\s*1[^}]*grid-row:\s*1/s);
+  assert.match(styles, /\.research-rail[^}]*grid-column:\s*2[^}]*grid-row:\s*1 \/ span 2/s);
   assert.match(styles, /\.map-view-switcher[^}]*grid-template-columns:\s*repeat\(3,/s);
   assert.match(styles, /\.agent-updates-view[^}]*width:\s*min\(760px,/s);
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
