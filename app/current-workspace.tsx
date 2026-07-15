@@ -227,7 +227,11 @@ export function CurrentWorkspace() {
 
       <main className="learning-canvas">
         {workspaceView === "map" ? (
-          <LearningMap onOpenLesson={openLesson} onOpenSidebar={() => setSidebarOpen(true)} />
+          <LearningMap
+            onOpenLesson={openLesson}
+            onOpenSidebar={() => setSidebarOpen(true)}
+            onApplyResearchUpdate={finishAndSchedule}
+          />
         ) : (
           <>
             <div className="lesson-toolbar">

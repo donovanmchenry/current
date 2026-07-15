@@ -12,7 +12,6 @@ import {
   FileDiff,
   FolderOpen,
   List,
-  LoaderCircle,
   Menu,
   Network,
   RotateCcw,
@@ -29,6 +28,7 @@ import {
   type Node,
   type NodeProps,
   type NodeTypes,
+  useReactFlow,
 } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -47,14 +47,14 @@ type LearningPath = {
 };
 
 type LearningNodeData = Record<string, unknown> & {
-  kind: "path" | "concept";
   title: string;
   detail: string;
   pathId: string;
   progress?: number;
   current?: boolean;
   changed?: boolean;
-  researching?: boolean;
+  changeLabel?: "Added" | "Updated";
+  planned?: boolean;
 };
 
 type LearningNode = Node<LearningNodeData, "learning">;
@@ -85,7 +85,7 @@ const basePaths: LearningPath[] = [
     progress: 21,
     concepts: ["Eval design", "Trace grading", "Regression sets", "Failure taxonomies", "Human review", "Release gates"],
     next: "Trace grading",
-    status: "Researching",
+    status: "In progress",
   },
 ];
 
@@ -96,34 +96,84 @@ const suggestedPath: LearningPath = {
   progress: 0,
   concepts: ["Tool failure modes", "Retry policy", "Human handoff", "Reliability budgets"],
   next: "Tool failure modes",
-  status: "Added by research",
+  status: "Added from suggestion",
 };
 
+const mapStorageKey = "current-learning-map-v1";
 const nodeTypes = { learning: LearningGraphNode } satisfies NodeTypes;
 
-export function LearningMap({ onOpenLesson, onOpenSidebar }: { onOpenLesson: () => void; onOpenSidebar: () => void }) {
+type LearningMapProps = {
+  onOpenLesson: () => void;
+  onOpenSidebar: () => void;
+  onApplyResearchUpdate: () => void;
+};
+
+export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate }: LearningMapProps) {
   const [mapMode, setMapMode] = useState<MapMode>("map");
   const [selectedPathId, setSelectedPathId] = useState("long-running");
   const [proposalStatus, setProposalStatus] = useState<ProposalStatus>("ready");
   const [suggestionStatus, setSuggestionStatus] = useState<SuggestionStatus>("ready");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [plannedPathId, setPlannedPathId] = useState<string | null>(null);
+  const [compactGraph, setCompactGraph] = useState(false);
   const mapBodyRef = useRef<HTMLDivElement>(null);
+  const storageHydratedRef = useRef(false);
 
   const paths = useMemo(
     () => suggestionStatus === "added" ? [...basePaths, suggestedPath] : basePaths,
     [suggestionStatus],
   );
   const selectedPath = paths.find((path) => path.id === selectedPathId) ?? paths[0];
+  const plannedPath = paths.find((path) => path.id === plannedPathId);
+  const pendingUpdates = Number(proposalStatus === "ready") + Number(suggestionStatus === "ready");
   const nodes = useMemo(
-    () => createNodes(proposalStatus === "applied", suggestionStatus === "added"),
-    [proposalStatus, suggestionStatus],
+    () => createNodes(proposalStatus === "applied", suggestionStatus === "added", plannedPathId, compactGraph),
+    [compactGraph, plannedPathId, proposalStatus, suggestionStatus],
   );
   const edges = useMemo(() => createEdges(suggestionStatus === "added"), [suggestionStatus]);
 
   useEffect(() => {
     mapBodyRef.current?.scrollTo({ top: 0 });
   }, [mapMode]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const syncGraphLayout = () => setCompactGraph(media.matches);
+    syncGraphLayout();
+    media.addEventListener("change", syncGraphLayout);
+    return () => media.removeEventListener("change", syncGraphLayout);
+  }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(mapStorageKey) ?? "null") as {
+          proposalStatus?: ProposalStatus;
+          suggestionStatus?: SuggestionStatus;
+          plannedPathId?: string | null;
+        } | null;
+        if (saved?.proposalStatus && ["ready", "applied", "dismissed"].includes(saved.proposalStatus)) {
+          setProposalStatus(saved.proposalStatus);
+        }
+        if (saved?.suggestionStatus && ["ready", "added", "dismissed"].includes(saved.suggestionStatus)) {
+          setSuggestionStatus(saved.suggestionStatus);
+        }
+        if (typeof saved?.plannedPathId === "string" || saved?.plannedPathId === null) {
+          setPlannedPathId(saved.plannedPathId);
+        }
+      } catch {
+        window.localStorage.removeItem(mapStorageKey);
+      } finally {
+        storageHydratedRef.current = true;
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!storageHydratedRef.current) return;
+    window.localStorage.setItem(mapStorageKey, JSON.stringify({ proposalStatus, suggestionStatus, plannedPathId }));
+  }, [plannedPathId, proposalStatus, suggestionStatus]);
 
   const selectPath = (pathId: string) => {
     setSelectedPathId(pathId);
@@ -143,6 +193,7 @@ export function LearningMap({ onOpenLesson, onOpenSidebar }: { onOpenLesson: () 
     setProposalStatus("applied");
     setReviewOpen(false);
     setSelectedPathId("long-running");
+    onApplyResearchUpdate();
   };
 
   return (
@@ -172,16 +223,17 @@ export function LearningMap({ onOpenLesson, onOpenSidebar }: { onOpenLesson: () 
                 nodesConnectable={false}
                 elementsSelectable
                 fitView
-                fitViewOptions={{ padding: 0.2, maxZoom: 1.05 }}
+                fitViewOptions={{ padding: 0.15, maxZoom: 1.05 }}
                 minZoom={0.32}
                 maxZoom={1.35}
                 onNodeClick={(_, node) => selectPath(node.data.pathId)}
-                aria-label="Connected learning paths and concepts"
+                aria-label="Connected learning paths"
               >
+                <FitGraph version={`${proposalStatus}-${suggestionStatus}-${compactGraph ? "compact" : "wide"}`} />
                 <Background color="#242424" gap={28} size={1} />
                 <Controls showInteractive={false} />
               </ReactFlow>
-              <div className="graph-status"><span>{paths.length} paths</span><span>{paths.reduce((total, path) => total + path.concepts.length, 0)} concepts</span><span><i /> Research active</span></div>
+              <div className="graph-status"><span>{paths.length} paths</span><span>{paths.reduce((total, path) => total + path.concepts.length, 0)} concepts</span>{plannedPath ? <span>Next: {plannedPath.title}</span> : null}</div>
             </div>
           ) : (
             <ul className="learning-path-list" aria-label="Learning paths">
@@ -189,7 +241,7 @@ export function LearningMap({ onOpenLesson, onOpenSidebar }: { onOpenLesson: () 
                 <li key={path.id}>
                   <button className={selectedPath.id === path.id ? "selected" : ""} onClick={() => selectPath(path.id)}>
                     <span className="path-list-icon"><FolderOpen size={17} /></span>
-                    <span className="path-list-copy"><strong>{path.title}</strong><small>{path.description}</small></span>
+                    <span className="path-list-copy"><strong>{path.title}{plannedPathId === path.id ? <em>Next</em> : null}</strong><small>{path.description}</small></span>
                     <span className="path-list-progress"><span><i style={{ width: `${path.progress}%` }} /></span><small>{path.progress}% · {path.concepts.length} concepts</small></span>
                     <ArrowRight size={15} />
                   </button>
@@ -209,17 +261,12 @@ export function LearningMap({ onOpenLesson, onOpenSidebar }: { onOpenLesson: () 
             {selectedPath.id === "long-running" ? (
               <button className="rail-primary-action" onClick={onOpenLesson}><BookOpen size={14} /> Continue Compaction</button>
             ) : (
-              <button className="rail-primary-action" disabled={plannedPathId === selectedPath.id} onClick={() => setPlannedPathId(selectedPath.id)}><Clock3 size={14} />{plannedPathId === selectedPath.id ? "Next session planned" : "Plan next session"}</button>
+              <button className="rail-primary-action" onClick={() => setPlannedPathId((current) => current === selectedPath.id ? null : selectedPath.id)}><Clock3 size={14} />{plannedPathId === selectedPath.id ? "Remove from queue" : "Set as next"}</button>
             )}
           </section>
 
           <section className="research-activity">
-            <div className="research-heading"><div><Activity size={15} /><span>Research activity</span></div><small>3 agents</small></div>
-
-            <article className="agent-activity-item running">
-              <span className="activity-icon"><LoaderCircle size={15} /></span>
-              <div><strong>Checking official sources</strong><p>Compaction, conversation state, and eval guidance</p><small>Running now</small></div>
-            </article>
+            <div className="research-heading"><div><Activity size={15} /><span>Agent updates</span></div><small>{pendingUpdates ? `${pendingUpdates} pending` : "Up to date"}</small></div>
 
             <article className={`agent-activity-item ${proposalStatus}`}>
               <span className="activity-icon">{proposalStatus === "applied" ? <Check size={15} /> : proposalStatus === "dismissed" ? <X size={15} /> : <FileDiff size={15} />}</span>
@@ -255,13 +302,37 @@ export function LearningMap({ onOpenLesson, onOpenSidebar }: { onOpenLesson: () 
   );
 }
 
+function FitGraph({ version }: { version: string }) {
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    let frame = 0;
+    const refit = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        void fitView({ padding: 0.15, maxZoom: 1.05, duration: 240 });
+      });
+    };
+
+    refit();
+    window.addEventListener("resize", refit);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", refit);
+    };
+  }, [fitView, version]);
+
+  return null;
+}
+
 function LearningGraphNode({ data, selected }: NodeProps<LearningNode>) {
   const className = [
     "learning-graph-node",
-    data.kind,
+    "path",
     selected ? "selected" : "",
     data.current ? "current" : "",
     data.changed ? "changed" : "",
+    data.planned ? "planned" : "",
   ].filter(Boolean).join(" ");
 
   return (
@@ -269,62 +340,53 @@ function LearningGraphNode({ data, selected }: NodeProps<LearningNode>) {
       <Handle id="left" type="target" position={Position.Left} className="learning-node-handle" />
       <Handle id="top" type="target" position={Position.Top} className="learning-node-handle" />
       <div className="graph-node-heading">
-        <span>{data.kind === "path" ? <FolderOpen size={14} /> : <span className="concept-dot" />}</span>
+        <span><FolderOpen size={14} /></span>
         <strong>{data.title}</strong>
-        {data.researching ? <LoaderCircle className="node-researching" size={12} /> : null}
       </div>
       <small>{data.detail}</small>
       {typeof data.progress === "number" ? <div className="graph-node-progress"><i style={{ width: `${data.progress}%` }} /></div> : null}
-      {data.changed ? <span className="node-change-label"><Sparkles size={10} /> Updated</span> : null}
+      {data.changed ? <span className="node-change-label"><Sparkles size={10} /> {data.changeLabel ?? "Updated"}</span> : null}
+      {data.planned ? <span className="node-plan-label"><Clock3 size={10} /> Next</span> : null}
       <Handle id="right" type="source" position={Position.Right} className="learning-node-handle" />
       <Handle id="bottom" type="source" position={Position.Bottom} className="learning-node-handle" />
     </div>
   );
 }
 
-function createNodes(updateApplied: boolean, suggestionAdded: boolean): LearningNode[] {
+function createNodes(updateApplied: boolean, suggestionAdded: boolean, plannedPathId: string | null, compact: boolean): LearningNode[] {
+  const positions = compact ? {
+    responses: { x: 25, y: 20 },
+    current: { x: 125, y: 160 },
+    evals: { x: 25, y: 300 },
+    reliability: { x: 125, y: 440 },
+  } : {
+    responses: { x: 30, y: 80 },
+    current: { x: 275, y: 260 },
+    evals: { x: 30, y: 460 },
+    reliability: { x: 275, y: 500 },
+  };
+
   const nodes: LearningNode[] = [
     {
       id: "path-responses",
       type: "learning",
-      position: { x: 40, y: 70 },
+      position: positions.responses,
       ariaLabel: "Responses API foundations learning path",
-      data: { kind: "path", title: "Responses API foundations", detail: "64% mastered", pathId: "responses-api", progress: 64 },
+      data: { title: "Responses API foundations", detail: "64% mastered · 4 concepts", pathId: "responses-api", progress: 64, planned: plannedPathId === "responses-api" },
     },
     {
       id: "path-long-running",
       type: "learning",
-      position: { x: 350, y: 205 },
+      position: positions.current,
       ariaLabel: "Long-running agents learning path",
-      data: { kind: "path", title: "Long-running agents", detail: "Current path · 5 concepts", pathId: "long-running", progress: 38, current: true },
+      data: { title: "Long-running agents", detail: updateApplied ? "Review added · 5 concepts" : "Current path · 5 concepts", pathId: "long-running", progress: 38, current: true, changed: updateApplied, changeLabel: updateApplied ? "Updated" : undefined },
     },
     {
       id: "path-evals",
       type: "learning",
-      position: { x: 700, y: 70 },
+      position: positions.evals,
       ariaLabel: "Agent evaluations learning path",
-      data: { kind: "path", title: "Agent evaluations", detail: "Researching · 6 concepts", pathId: "agent-evals", progress: 21, researching: true },
-    },
-    {
-      id: "concept-state",
-      type: "learning",
-      position: { x: 85, y: 365 },
-      ariaLabel: "Conversation state concept",
-      data: { kind: "concept", title: "Conversation state", detail: "Mastered", pathId: "long-running" },
-    },
-    {
-      id: "concept-compaction",
-      type: "learning",
-      position: { x: 355, y: 440 },
-      ariaLabel: "Compaction concept",
-      data: { kind: "concept", title: "Compaction", detail: updateApplied ? "Updated · review added" : "Learning now", pathId: "long-running", current: true, changed: updateApplied },
-    },
-    {
-      id: "concept-chaining",
-      type: "learning",
-      position: { x: 650, y: 350 },
-      ariaLabel: "Stateless chaining concept",
-      data: { kind: "concept", title: "Stateless chaining", detail: "Up next", pathId: "long-running" },
+      data: { title: "Agent evaluations", detail: "21% mastered · 6 concepts", pathId: "agent-evals", progress: 21, planned: plannedPathId === "agent-evals" },
     },
   ];
 
@@ -332,9 +394,9 @@ function createNodes(updateApplied: boolean, suggestionAdded: boolean): Learning
     nodes.push({
       id: "path-reliability",
       type: "learning",
-      position: { x: 720, y: 520 },
+      position: positions.reliability,
       ariaLabel: "Agent reliability learning path",
-      data: { kind: "path", title: "Agent reliability", detail: "Added by research · 4 concepts", pathId: "agent-reliability", progress: 0, changed: true },
+      data: { title: "Agent reliability", detail: "Added from suggestion · 4 concepts", pathId: "agent-reliability", progress: 0, changed: true, changeLabel: "Added", planned: plannedPathId === "agent-reliability" },
     });
   }
 
@@ -344,12 +406,9 @@ function createNodes(updateApplied: boolean, suggestionAdded: boolean): Learning
 function createEdges(suggestionAdded: boolean): Edge[] {
   const edges: Edge[] = [
     { id: "responses-long", source: "path-responses", sourceHandle: "right", target: "path-long-running", targetHandle: "left", label: "foundation", type: "smoothstep", className: "learning-edge" },
-    { id: "long-evals", source: "path-long-running", sourceHandle: "right", target: "path-evals", targetHandle: "left", label: "shared state", type: "smoothstep", className: "learning-edge" },
-    { id: "long-state", source: "path-long-running", sourceHandle: "bottom", target: "concept-state", targetHandle: "top", type: "smoothstep", className: "learning-edge" },
-    { id: "long-compaction", source: "path-long-running", sourceHandle: "bottom", target: "concept-compaction", targetHandle: "top", type: "smoothstep", className: "learning-edge active" },
-    { id: "long-chaining", source: "path-long-running", sourceHandle: "bottom", target: "concept-chaining", targetHandle: "top", type: "smoothstep", className: "learning-edge" },
+    { id: "long-evals", source: "path-long-running", sourceHandle: "bottom", target: "path-evals", targetHandle: "top", label: "shared state", type: "smoothstep", className: "learning-edge" },
   ];
 
-  if (suggestionAdded) edges.push({ id: "long-reliability", source: "path-long-running", sourceHandle: "right", target: "path-reliability", targetHandle: "left", label: "recommended", type: "smoothstep", className: "learning-edge suggested" });
+  if (suggestionAdded) edges.push({ id: "long-reliability", source: "path-long-running", sourceHandle: "bottom", target: "path-reliability", targetHandle: "top", label: "recommended", type: "smoothstep", className: "learning-edge suggested" });
   return edges;
 }

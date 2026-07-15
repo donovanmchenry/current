@@ -977,3 +977,9 @@ The revised MVP starts inside the act of learning:
 - No fake streaks, vanity mastery percentages, decorative agent logs, or dashboard as the first screen.
 
 The three-minute demo should prove one claim: Current does not merely answer questions about a topic. It structures the work required to understand it, notices the missing link, and changes the next learning interaction accordingly.
+
+## Learning Map Usability Pass
+
+The learning map should expose decisions, not simulate background intelligence. The graph is therefore limited to learning paths the user can select, continue, or queue; concept-level nodes should only return when they have a distinct concept workflow.
+
+Agent work appears as inspectable outputs with sources and explicit choices. Accepted updates schedule real review work, path suggestions can be added or dismissed, and those decisions persist across navigation and refresh. Indefinite spinners, decorative agent counts, and status text that cannot be verified do not belong in the MVP.
