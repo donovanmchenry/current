@@ -206,6 +206,7 @@ function actionConcepts(goal: string) {
 
 function subjectConcepts(subject: string) {
   const normalized = subject.toLowerCase();
+  if (/decision theory|decision analysis/.test(normalized)) return ["Actions, states, and outcomes", "Probability and expected value", "Risk preferences and utility", "Value of information", "Sensitivity analysis"];
   if (/causal|causality/.test(normalized)) return ["Potential outcomes and counterfactuals", "Confounding and identification", "Directed acyclic graphs", "Adjustment and study design"];
   if (/distributed system|distributed computing/.test(normalized)) return ["Replication and consistency", "Failure detection and recovery", "Partitioning and consensus", "Architecture tradeoffs"];
   if (/machine learning|neural network|deep learning/.test(normalized)) return ["Features and representations", "Training and generalization", "Loss functions and optimization", "Model evaluation and error analysis"];
@@ -216,6 +217,57 @@ function subjectConcepts(subject: string) {
   if (/history|historical/.test(normalized)) return ["Context and chronology", "Actors and institutions", "Primary-source interpretation", "Competing explanations"];
   if (/language|spanish|french|german|japanese|mandarin/.test(normalized)) return ["Core sound and sentence patterns", "High-frequency vocabulary", "Comprehension in context", "Guided production and correction"];
   return [];
+}
+
+function conceptContent(title: string, subject: string, goal: string, final: boolean): Pick<LearningConcept, "objective" | "summary" | "checkpoints"> {
+  const normalized = title.toLowerCase();
+  if (final) return {
+    objective: `Compare a concrete ${subject} decision, defend the choice, and explain what evidence could change it.`,
+    summary: `This final activity combines the path into one decision you can inspect, challenge, and revise.`,
+    checkpoints: ["Frame the decision", "Compare alternatives", "Test what would change the choice"],
+  };
+  if (/foundation/.test(normalized)) return {
+    objective: `Identify the core objects, assumptions, and questions that define a ${subject} problem.`,
+    summary: `A useful foundation separates the decision itself from the evidence, constraints, and outcomes around it.`,
+    checkpoints: ["Core vocabulary", "Assumptions and boundaries", "A representative problem"],
+  };
+  if (/actions?.*states?.*outcomes?/.test(normalized)) return {
+    objective: "Represent a decision as available actions, uncertain states, and resulting outcomes.",
+    summary: "Separating what you control from what remains uncertain prevents outcomes from being confused with choices.",
+    checkpoints: ["Available actions", "Uncertain states", "Consequences for each pairing"],
+  };
+  if (/probability|expected value/.test(normalized)) return {
+    objective: "Calculate expected value from possible outcomes and their probabilities, then state what the average hides.",
+    summary: "Expected value gives a probability-weighted comparison, but it does not capture every difference in downside or preference.",
+    checkpoints: ["Outcome probabilities", "Probability-weighted value", "Limits of the average"],
+  };
+  if (/risk|utility/.test(normalized)) return {
+    objective: "Compare decisions with similar expected value but different downside, variance, or utility.",
+    summary: "Risk preferences explain why the same payoff distribution can support different choices for different decision-makers.",
+    checkpoints: ["Downside exposure", "Risk tolerance", "Utility rather than raw payoff"],
+  };
+  if (/value of information|value uncertainty/.test(normalized)) return {
+    objective: "Decide whether reducing uncertainty is worth the cost and delay of gathering more information.",
+    summary: "Information has value when it can change the chosen action enough to justify acquiring it.",
+    checkpoints: ["Decision-relevant uncertainty", "Cost of information", "Chance the choice changes"],
+  };
+  if (/sensitivity|compare decisions/.test(normalized)) return {
+    objective: "Vary the uncertain assumptions in a decision and identify when the preferred option changes.",
+    summary: "Sensitivity analysis reveals which assumptions actually control the decision and which details are distractions.",
+    checkpoints: ["Key assumptions", "Plausible ranges", "Decision-switching thresholds"],
+  };
+  if (/comparing decisions under risk/.test(normalized)) return {
+    objective: "Compare alternatives under uncertainty using expected outcomes, downside exposure, and explicit tradeoffs.",
+    summary: "A defensible comparison makes uncertainty and risk tolerance visible instead of hiding them in one score.",
+    checkpoints: ["Alternatives and outcomes", "Probability and downside", "Tradeoff justification"],
+  };
+
+  const conciseGoal = cleanText(goal).replace(/^(?:understand|learn)\s+/i, "").replace(/[.]$/, "");
+  return {
+    objective: `Explain ${title.toLowerCase()} and use it to ${conciseGoal}.`,
+    summary: `${title} is one working piece of ${subject}; learn what it changes, where it applies, and how it can fail.`,
+    checkpoints: ["Definition and boundaries", "Effect on a real decision", "A common failure or limitation"],
+  };
 }
 
 function buildConcepts(subject: string, goal: string, fetched: FetchedSource[], textFiles: TextFileSource[], files: File[]): LearningConcept[] {
@@ -248,12 +300,7 @@ function buildConcepts(subject: string, goal: string, fetched: FetchedSource[], 
   const practiceTitle = `${subjectTitle} in practice`;
   if (!titles.some((title) => title.toLowerCase() === practiceTitle.toLowerCase())) titles.push(practiceTitle);
 
-  return titles.map((title, index) => ({
-    title,
-    objective: index === titles.length - 1
-      ? `Use the key ideas from ${subjectTitle} in a concrete task and explain the result.`
-      : `Build an accurate working understanding of ${title.toLowerCase()}.`,
-  }));
+  return titles.map((title, index) => ({ title, ...conceptContent(title, subjectTitle, goal, index === titles.length - 1) }));
 }
 
 function demoPath(subject: string, goal: string, fetched: FetchedSource[], textFiles: TextFileSource[], files: File[]): GeneratedLearningPath {
@@ -284,7 +331,12 @@ function validateGeneratedPath(value: unknown): Omit<GeneratedLearningPath, "mod
   return {
     title: cleanHeading(path.title).slice(0, 80),
     description: cleanText(path.description).slice(0, 220),
-    concepts: concepts.slice(0, 7).map((concept) => ({ title: cleanHeading(concept.title), objective: cleanText(concept.objective).slice(0, 180) })),
+    concepts: concepts.slice(0, 7).map((concept) => ({
+      title: cleanHeading(concept.title),
+      objective: cleanText(concept.objective).slice(0, 240),
+      summary: typeof concept.summary === "string" ? cleanText(concept.summary).slice(0, 360) : undefined,
+      checkpoints: Array.isArray(concept.checkpoints) ? concept.checkpoints.filter((item): item is string => typeof item === "string").map((item) => cleanText(item).slice(0, 120)).slice(0, 5) : undefined,
+    })),
     relatedPathId: allowedRelatedPaths.has(path.relatedPathId ?? null) ? path.relatedPathId ?? null : null,
   };
 }
@@ -340,7 +392,7 @@ export async function POST(request: Request) {
         input: [
           {
             role: "system",
-            content: "You design source-grounded learning paths for Current. Produce 5 to 7 progressive, specific concepts that move from prerequisite mental models to application. Every concept needs a concrete learning objective. Use supplied source terminology when it is relevant, but do not reproduce navigation headings or invent claims. Keep the title literal and concise. relatedPathId may be long-running, responses-api, agent-evals, or null.",
+            content: "You design source-grounded learning paths for Current. Produce 5 to 7 progressive, specific concepts that move from prerequisite mental models to application. Every concept needs a concrete learning objective, a two-sentence-or-shorter explanation, and 2 to 4 checkpoints that can be tested through active recall. Avoid tautologies such as 'understand X' for a concept named X. Use supplied source terminology when relevant, but do not reproduce navigation headings or invent claims. Keep the title literal and concise. relatedPathId may be long-running, responses-api, agent-evals, or null.",
           },
           { role: "user", content },
         ],
@@ -362,8 +414,13 @@ export async function POST(request: Request) {
                   items: {
                     type: "object",
                     additionalProperties: false,
-                    properties: { title: { type: "string" }, objective: { type: "string" } },
-                    required: ["title", "objective"],
+                    properties: {
+                      title: { type: "string" },
+                      objective: { type: "string" },
+                      summary: { type: "string" },
+                      checkpoints: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } },
+                    },
+                    required: ["title", "objective", "summary", "checkpoints"],
                   },
                 },
                 relatedPathId: { anyOf: [{ type: "string", enum: ["long-running", "responses-api", "agent-evals"] }, { type: "null" }] },

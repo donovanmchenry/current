@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   Brain,
@@ -23,23 +22,25 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { basePaths, suggestedPath } from "../lib/learning-catalog";
+import type { LearningConcept, LearningPath } from "../lib/learning-path";
+import {
+  defaultProgress,
+  defaultReviews,
+  isStoredLearningPath,
+  nextIncompleteConcept,
+  pathWithProgress,
+  progressForPath,
+  type LearningRuntimeSnapshot,
+  type PathProgress,
+  type ReviewItem,
+} from "../lib/learning-runtime";
 import { scheduleReview } from "../lib/spaced-review";
 import { LearningMap } from "./learning-map";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
 type WorkspaceView = "lesson" | "map";
-type ConceptStatus = "done" | "current" | "next" | "locked";
-
-type CourseConcept = {
-  label: string;
-  status: ConceptStatus;
-  objective: string;
-  summary: string;
-  checkpoints: string[];
-  sourceIds: string[];
-};
-
 type Evaluation = {
   score: number;
   verdict: string;
@@ -49,64 +50,6 @@ type Evaluation = {
   mode: "live" | "demo";
 };
 
-const sources = [
-  {
-    id: "compaction",
-    title: "Compaction",
-    detail: "Server-side and standalone compaction",
-    href: "https://developers.openai.com/api/docs/guides/compaction",
-  },
-  {
-    id: "conversation-state",
-    title: "Conversation state",
-    detail: "Responses, conversations, and chaining",
-    href: "https://developers.openai.com/api/docs/guides/conversation-state",
-  },
-];
-
-const concepts: CourseConcept[] = [
-  {
-    label: "Conversation state",
-    status: "done",
-    objective: "Explain which state belongs to a response, a conversation, and your application.",
-    summary: "Long-running work depends on knowing where continuity lives. Responses can be chained directly, attached to a durable conversation, or carried forward by your application.",
-    checkpoints: ["Response objects and output items", "Durable conversation identifiers", "Application-owned state boundaries"],
-    sourceIds: ["conversation-state"],
-  },
-  {
-    label: "Compaction",
-    status: "current",
-    objective: "Explain when compaction runs and what its opaque item preserves.",
-    summary: "Compaction reduces accumulated context while preserving the state and reasoning needed to continue later turns.",
-    checkpoints: ["Rendered-token thresholds", "Opaque compact items", "The next request after compaction"],
-    sourceIds: ["compaction", "conversation-state"],
-  },
-  {
-    label: "Stateless chaining",
-    status: "next",
-    objective: "Choose what the next request must contain when the application does not keep a conversation object.",
-    summary: "Stateless chaining keeps continuity explicit. The application either appends prior response output to the next input or carries a previous response ID forward.",
-    checkpoints: ["Input-array chaining", "Using previous_response_id", "Avoiding duplicate or pruned state"],
-    sourceIds: ["conversation-state", "compaction"],
-  },
-  {
-    label: "Recovery patterns",
-    status: "locked",
-    objective: "Recover an interrupted agent without replaying unnecessary context or duplicating work.",
-    summary: "Recovery starts from the last trustworthy state boundary, then resumes with enough context to continue without repeating completed tool actions.",
-    checkpoints: ["Durable checkpoints", "Idempotent tool execution", "Resuming from the last valid response"],
-    sourceIds: ["conversation-state"],
-  },
-  {
-    label: "Implementation check",
-    status: "locked",
-    objective: "Configure, run, and verify compaction inside a working agent loop.",
-    summary: "The final concept combines context policy, chaining, and recovery into one implementation that can be inspected and tested.",
-    checkpoints: ["Compaction configuration", "Request-chain verification", "Failure and recovery test cases"],
-    sourceIds: ["compaction", "conversation-state"],
-  },
-];
-
 const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
   { id: "read", label: "Read", icon: BookOpen },
   { id: "recall", label: "Recall", icon: Brain },
@@ -115,12 +58,20 @@ const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
 ];
 
 const noteExcerpt = "Compaction preserves key prior state in an opaque item while using fewer tokens.";
+const runtimeStorageKey = "current-learning-runtime-v1";
 
 export function CurrentWorkspace() {
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("lesson");
+  const [customPaths, setCustomPaths] = useState<LearningPath[]>([]);
+  const [suggestedPathAdded, setSuggestedPathAdded] = useState(false);
+  const [activePathId, setActivePathId] = useState("long-running");
   const [activeConceptIndex, setActiveConceptIndex] = useState(1);
+  const [queue, setQueue] = useState<string[]>([]);
+  const [progress, setProgress] = useState<Record<string, PathProgress>>(defaultProgress);
+  const [reviews, setReviews] = useState<ReviewItem[]>(defaultReviews);
+  const [notesByConcept, setNotesByConcept] = useState<Record<string, string>>({});
+  const [reflectionsByConcept, setReflectionsByConcept] = useState<Record<string, string>>({});
   const [mode, setMode] = useState<Mode>("read");
-  const [notes, setNotes] = useState("");
   const [recallAnswer, setRecallAnswer] = useState("");
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -128,24 +79,68 @@ export function CurrentWorkspace() {
   const [codeChoice, setCodeChoice] = useState<number | null>(null);
   const [codeChecked, setCodeChecked] = useState(false);
   const [recallPassed, setRecallPassed] = useState(false);
-  const [reflection, setReflection] = useState("");
-  const [nextReview, setNextReview] = useState<string | null>(null);
-  const [highlighted, setHighlighted] = useState(false);
+  const [applicationAnswer, setApplicationAnswer] = useState("");
+  const [applicationChecked, setApplicationChecked] = useState(false);
+  const [applicationPassed, setApplicationPassed] = useState(false);
+  const [lessonFinished, setLessonFinished] = useState(false);
+  const [scheduledReviewAt, setScheduledReviewAt] = useState<string | null>(null);
+  const [completionNextIndex, setCompletionNextIndex] = useState<number | null>(null);
+  const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [notebookOpen, setNotebookOpen] = useState(false);
   const hydrated = useRef(false);
   const lessonScrollRef = useRef<HTMLDivElement>(null);
 
+  const rawPaths = useMemo(
+    () => [...basePaths, ...(suggestedPathAdded ? [suggestedPath] : []), ...customPaths],
+    [customPaths, suggestedPathAdded],
+  );
+  const paths = useMemo(() => rawPaths.map((path) => pathWithProgress(
+    path,
+    progress[path.id],
+    reviews.filter((review) => review.pathId === path.id && new Date(review.dueAt).getTime() <= Date.now()).length,
+    path.id === activePathId,
+  )), [activePathId, progress, rawPaths, reviews]);
+  const activePath = paths.find((path) => path.id === activePathId) ?? paths[0];
+  const activeProgress = progressForPath(activePath, progress[activePath.id]);
+  const safeConceptIndex = Math.max(0, Math.min(activeConceptIndex, activePath.concepts.length - 1));
+  const activeConcept = activePath.concepts[safeConceptIndex];
+  const conceptKey = `${activePath.id}:${safeConceptIndex}`;
+  const notes = notesByConcept[conceptKey] ?? "";
+  const reflection = reflectionsByConcept[conceptKey] ?? "";
+  const activeSources = activePath.sources ?? [];
+  const isCompactionLesson = activePath.id === "long-running" && safeConceptIndex === 1;
+  const highlighted = isCompactionLesson && notes.includes(noteExcerpt);
+
   useEffect(() => {
-    const savedNotes = window.localStorage.getItem("current-notebook-v2") ?? "";
-    const savedReflection = window.localStorage.getItem("current-reflection-v1") ?? "";
-    const savedReview = window.localStorage.getItem("current-review-v1");
     const frame = window.requestAnimationFrame(() => {
-      setNotes(savedNotes);
-      setReflection(savedReflection);
-      setNextReview(savedReview);
-      setHighlighted(savedNotes.includes(noteExcerpt));
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(runtimeStorageKey) ?? "null") as Partial<LearningRuntimeSnapshot> | null;
+        if (saved) {
+          const savedCustomPaths = Array.isArray(saved.customPaths) ? saved.customPaths.filter(isStoredLearningPath).slice(0, 12) : [];
+          setCustomPaths(savedCustomPaths);
+          setSuggestedPathAdded(Boolean(saved.suggestedPathAdded));
+          if (typeof saved.activePathId === "string") setActivePathId(saved.activePathId);
+          if (Number.isInteger(saved.activeConceptIndex)) setActiveConceptIndex(saved.activeConceptIndex as number);
+          if (Array.isArray(saved.queue)) setQueue(saved.queue.filter((pathId): pathId is string => typeof pathId === "string"));
+          if (saved.progress && typeof saved.progress === "object") setProgress(sanitizeProgress(saved.progress));
+          if (Array.isArray(saved.reviews)) setReviews(saved.reviews.filter(isStoredReview));
+          if (saved.notes && typeof saved.notes === "object") setNotesByConcept(sanitizeTextRecord(saved.notes));
+          if (saved.reflections && typeof saved.reflections === "object") setReflectionsByConcept(sanitizeTextRecord(saved.reflections));
+        } else {
+          const oldNotes = window.localStorage.getItem("current-notebook-v2") ?? "";
+          const oldReflection = window.localStorage.getItem("current-reflection-v1") ?? "";
+          const oldMap = JSON.parse(window.localStorage.getItem("current-learning-map-v1") ?? "null") as { customPaths?: unknown[]; plannedPathId?: unknown; suggestionStatus?: unknown } | null;
+          if (oldNotes) setNotesByConcept({ "long-running:1": oldNotes });
+          if (oldReflection) setReflectionsByConcept({ "long-running:1": oldReflection });
+          if (Array.isArray(oldMap?.customPaths)) setCustomPaths(oldMap.customPaths.filter(isStoredLearningPath).slice(0, 12));
+          if (typeof oldMap?.plannedPathId === "string") setQueue([oldMap.plannedPathId]);
+          if (oldMap?.suggestionStatus === "added") setSuggestedPathAdded(true);
+        }
+      } catch {
+        window.localStorage.removeItem(runtimeStorageKey);
+      }
       hydrated.current = true;
     });
     return () => window.cancelAnimationFrame(frame);
@@ -153,17 +148,23 @@ export function CurrentWorkspace() {
 
   useEffect(() => {
     if (!hydrated.current) return;
-    window.localStorage.setItem("current-notebook-v2", notes);
-    window.localStorage.setItem("current-reflection-v1", reflection);
-    if (nextReview) window.localStorage.setItem("current-review-v1", nextReview);
-  }, [nextReview, notes, reflection]);
+    const snapshot: LearningRuntimeSnapshot = {
+      activePathId: activePath.id,
+      activeConceptIndex: safeConceptIndex,
+      queue,
+      progress,
+      reviews,
+      customPaths,
+      suggestedPathAdded,
+      notes: notesByConcept,
+      reflections: reflectionsByConcept,
+    };
+    window.localStorage.setItem(runtimeStorageKey, JSON.stringify(snapshot));
+  }, [activePath.id, customPaths, notesByConcept, progress, queue, reflectionsByConcept, reviews, safeConceptIndex, suggestedPathAdded]);
 
   const modeIndex = modeItems.findIndex((item) => item.id === mode);
-  const recallComplete = recallPassed || Boolean(nextReview);
-  const codePassed = (codeChecked && codeChoice === 1) || Boolean(nextReview);
-  const activeConcept = concepts[activeConceptIndex] ?? concepts[1];
-  const activeSources = sources.filter((source) => activeConcept.sourceIds.includes(source.id));
-  const isCurrentConcept = activeConceptIndex === 1;
+  const recallComplete = recallPassed || lessonFinished;
+  const codePassed = (isCompactionLesson ? codeChecked && codeChoice === 1 : applicationPassed) || lessonFinished;
 
   const transitionToMode = (nextMode: Mode) => {
     if (nextMode === mode) return;
@@ -171,9 +172,19 @@ export function CurrentWorkspace() {
     setMode(nextMode);
   };
 
+  const setNotes = (value: string | ((current: string) => string)) => {
+    setNotesByConcept((current) => ({
+      ...current,
+      [conceptKey]: typeof value === "function" ? value(current[conceptKey] ?? "") : value,
+    }));
+  };
+
+  const setReflection = (value: string) => {
+    setReflectionsByConcept((current) => ({ ...current, [conceptKey]: value }));
+  };
+
   const addExcerptToNotes = () => {
     setNotes((value) => value.includes(noteExcerpt) ? value : value ? `${value}\n\n${noteExcerpt}` : noteExcerpt);
-    setHighlighted(true);
     setNotebookOpen(true);
   };
 
@@ -184,14 +195,19 @@ export function CurrentWorkspace() {
       const response = await fetch("/api/coach", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ answer: recallAnswer, lesson: "compaction" }),
+        body: JSON.stringify({
+          answer: recallAnswer,
+          concept: activeConcept.title,
+          objective: activeConcept.objective,
+          checkpoints: activeConcept.checkpoints ?? [],
+        }),
       });
       if (!response.ok) throw new Error("Evaluation failed");
       const result = (await response.json()) as Evaluation;
       setEvaluation(result);
       if (result.score >= 75) setRecallPassed(true);
     } catch {
-      const result = localEvaluation(recallAnswer);
+      const result = localEvaluation(recallAnswer, activeConcept);
       setEvaluation(result);
       if (result.score >= 75) setRecallPassed(true);
     } finally {
@@ -202,6 +218,7 @@ export function CurrentWorkspace() {
   const resetRecall = () => {
     setRecallAnswer("");
     setEvaluation(null);
+    setRecallPassed(false);
   };
 
   const checkCode = () => {
@@ -209,9 +226,36 @@ export function CurrentWorkspace() {
     setCodeChecked(true);
   };
 
+  const checkApplication = () => {
+    const passed = applicationAnswer.trim().length >= 40;
+    setApplicationChecked(true);
+    setApplicationPassed(passed);
+  };
+
   const finishAndSchedule = () => {
-    const schedule = scheduleReview({ intervalDays: 1, ease: 2.5, repetitions: 0 }, 4);
-    setNextReview(schedule.nextReview.toISOString());
+    const existingReview = reviews.find((review) => review.id === activeReviewId)
+      ?? reviews.find((review) => review.pathId === activePath.id && review.conceptIndex === safeConceptIndex);
+    const scheduled = scheduleReview(existingReview?.memory ?? { intervalDays: 1, ease: 2.5, repetitions: 0 }, 4);
+    const review: ReviewItem = {
+      id: existingReview?.id ?? `review-${activePath.id}-${safeConceptIndex}`,
+      pathId: activePath.id,
+      conceptIndex: safeConceptIndex,
+      dueAt: scheduled.nextReview.toISOString(),
+      memory: { intervalDays: scheduled.intervalDays, ease: scheduled.ease, repetitions: scheduled.repetitions },
+      reason: "completion",
+    };
+    const currentProgress = progressForPath(activePath, progress[activePath.id]);
+    const completedConceptIndexes = [...new Set([...currentProgress.completedConceptIndexes, safeConceptIndex])].sort((left, right) => left - right);
+    const nextIndex = nextIncompleteConcept(activePath, { ...currentProgress, completedConceptIndexes }, safeConceptIndex);
+    setProgress((current) => ({
+      ...current,
+      [activePath.id]: { currentConceptIndex: nextIndex ?? safeConceptIndex, completedConceptIndexes },
+    }));
+    setReviews((current) => [...current.filter((item) => item.id !== review.id && !(item.pathId === review.pathId && item.conceptIndex === review.conceptIndex)), review]);
+    setScheduledReviewAt(review.dueAt);
+    setCompletionNextIndex(nextIndex);
+    setLessonFinished(true);
+    setActiveReviewId(null);
   };
 
   const openLearningMap = () => {
@@ -221,15 +265,100 @@ export function CurrentWorkspace() {
     setWorkspaceView("map");
   };
 
-  const openLesson = (conceptIndex = activeConceptIndex) => {
-    const nextConceptIndex = Math.max(0, Math.min(concepts.length - 1, conceptIndex));
+  const resetLessonActivity = (nextMode: Mode) => {
+    setMode(nextMode);
+    setRecallAnswer("");
+    setEvaluation(null);
+    setIsEvaluating(false);
+    setSupportMode("none");
+    setCodeChoice(null);
+    setCodeChecked(false);
+    setRecallPassed(false);
+    setApplicationAnswer("");
+    setApplicationChecked(false);
+    setApplicationPassed(false);
+    setLessonFinished(false);
+    setScheduledReviewAt(null);
+    setCompletionNextIndex(null);
+    setActiveReviewId(null);
+  };
+
+  const openLesson = (pathId = activePath.id, conceptIndex = safeConceptIndex, nextMode: Mode = "read") => {
+    const path = paths.find((candidate) => candidate.id === pathId) ?? activePath;
+    const nextConceptIndex = Math.max(0, Math.min(path.concepts.length - 1, conceptIndex));
+    const pathProgress = progressForPath(path, progress[path.id]);
+    setActivePathId(path.id);
     setActiveConceptIndex(nextConceptIndex);
-    setMode("read");
+    if (!pathProgress.completedConceptIndexes.includes(nextConceptIndex)) {
+      setProgress((current) => ({ ...current, [path.id]: { ...pathProgress, currentConceptIndex: nextConceptIndex } }));
+    }
+    setQueue((current) => current.filter((queuedPathId) => queuedPathId !== path.id));
+    resetLessonActivity(nextMode);
     setSourcesOpen(false);
-    if (nextConceptIndex !== 1) setNotebookOpen(false);
+    setNotebookOpen(false);
     setSidebarOpen(false);
     setWorkspaceView("lesson");
     window.requestAnimationFrame(() => lessonScrollRef.current?.scrollTo({ top: 0 }));
+  };
+
+  const continueLesson = () => {
+    const current = progressForPath(activePath, progress[activePath.id]);
+    openLesson(activePath.id, current.currentConceptIndex);
+  };
+
+  const startReview = (review: ReviewItem) => {
+    openLesson(review.pathId, review.conceptIndex, "recall");
+    setActiveReviewId(review.id);
+  };
+
+  const continueAfterCompletion = () => {
+    if (completionNextIndex !== null) {
+      openLesson(activePath.id, completionNextIndex);
+      return;
+    }
+    const queuedPath = paths.find((path) => path.id === queue[0]);
+    if (queuedPath) {
+      openLesson(queuedPath.id, progressForPath(queuedPath, progress[queuedPath.id]).currentConceptIndex);
+      return;
+    }
+    openLearningMap();
+  };
+
+  const toggleQueue = (pathId: string) => {
+    setQueue((current) => current.includes(pathId) ? current.filter((item) => item !== pathId) : [...current, pathId]);
+  };
+
+  const addCustomPath = (path: LearningPath) => {
+    setCustomPaths((current) => [...current.filter((item) => item.id !== path.id), path]);
+    setProgress((current) => ({ ...current, [path.id]: { currentConceptIndex: 0, completedConceptIndexes: [] } }));
+  };
+
+  const removeCustomPath = (pathId: string) => {
+    setCustomPaths((current) => current.filter((path) => path.id !== pathId));
+    setQueue((current) => current.filter((item) => item !== pathId));
+    setReviews((current) => current.filter((review) => review.pathId !== pathId));
+    setProgress((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== pathId)));
+    if (activePath.id === pathId) {
+      setActivePathId("long-running");
+      setActiveConceptIndex(1);
+    }
+  };
+
+  const addSuggestedPath = () => {
+    setSuggestedPathAdded(true);
+    setProgress((current) => ({ ...current, [suggestedPath.id]: progressForPath(suggestedPath) }));
+  };
+
+  const applyResearchUpdate = () => {
+    const review: ReviewItem = {
+      id: "review-research-long-running-1",
+      pathId: "long-running",
+      conceptIndex: 1,
+      dueAt: new Date().toISOString(),
+      memory: { intervalDays: 1, ease: 2.5, repetitions: 0 },
+      reason: "research",
+    };
+    setReviews((current) => [...current.filter((item) => item.id !== review.id), review]);
   };
 
   return (
@@ -248,20 +377,22 @@ export function CurrentWorkspace() {
         </div>
         <button className={`track-title ${workspaceView === "map" ? "active" : ""}`} aria-current={workspaceView === "map" ? "page" : undefined} onClick={openLearningMap}>
           <span className="track-icon"><FolderOpen size={16} /></span>
-          <div><strong>Long-running agents</strong><small>OpenAI API · 5 concepts</small></div>
+          <div><strong>{activePath.title}</strong><small>{activePath.concepts.length} concepts</small></div>
           <ChevronRight size={14} />
         </button>
 
         <ol className="concept-path">
-          {concepts.map((concept, index) => (
-            <li className={`${concept.status} ${activeConceptIndex === index ? "selected" : ""}`} key={concept.label}>
-              <button className="concept-row" aria-current={activeConceptIndex === index ? "page" : undefined} onClick={() => openLesson(index)}>
-                <span className="concept-state">{concept.status === "done" ? <Check size={11} /> : index + 1}</span>
-                <span>{concept.label}</span>
-                {concept.status === "current" ? <span className="now-label">Now</span> : null}
+          {activePath.concepts.map((concept, index) => {
+            const conceptStatus = activeProgress.completedConceptIndexes.includes(index) ? "done" : index === activeProgress.currentConceptIndex ? "current" : "locked";
+            return (
+            <li className={`${conceptStatus} ${safeConceptIndex === index ? "selected" : ""}`} key={concept.title}>
+              <button className="concept-row" aria-current={safeConceptIndex === index ? "page" : undefined} onClick={() => openLesson(activePath.id, index)}>
+                <span className="concept-state">{conceptStatus === "done" ? <Check size={11} /> : index + 1}</span>
+                <span>{concept.title}</span>
+                {conceptStatus === "current" ? <span className="now-label">Now</span> : null}
               </button>
             </li>
-          ))}
+          );})}
         </ol>
 
         <div className="sidebar-bottom">
@@ -269,12 +400,12 @@ export function CurrentWorkspace() {
             <div className="sidebar-sources-drawer">
               <div className="sidebar-sources">
                 <div className="sidebar-sources-heading"><span>Official sources</span><small>For this concept</small></div>
-                {activeSources.map((source) => (
-                  <a href={source.href} target="_blank" rel="noreferrer" tabIndex={sourcesOpen ? 0 : -1} className="sidebar-source-item" key={source.title}>
-                    <FileText size={14} />
-                    <span><strong>{source.title}</strong><small>{source.detail}</small></span>
-                    <ExternalLink size={12} />
+                {activeSources.map((source) => source.href ? (
+                  <a href={source.href} target="_blank" rel="noreferrer" tabIndex={sourcesOpen ? 0 : -1} className="sidebar-source-item" key={source.id}>
+                    <FileText size={14} /><span><strong>{source.title}</strong><small>{source.detail}</small></span><ExternalLink size={12} />
                   </a>
+                ) : (
+                  <div className="sidebar-source-item" key={source.id}><FileText size={14} /><span><strong>{source.title}</strong><small>{source.detail}</small></span></div>
                 ))}
               </div>
             </div>
@@ -286,18 +417,29 @@ export function CurrentWorkspace() {
       <main className="learning-canvas">
         {workspaceView === "map" ? (
           <LearningMap
+            paths={paths}
+            activePathId={activePath.id}
+            queue={queue}
+            progress={progress}
+            reviews={reviews}
+            suggestedPathAdded={suggestedPathAdded}
+            onContinueLesson={continueLesson}
             onOpenLesson={openLesson}
-            onApplyResearchUpdate={finishAndSchedule}
+            onQueuePath={toggleQueue}
+            onAddCustomPath={addCustomPath}
+            onRemoveCustomPath={removeCustomPath}
+            onAddSuggestedPath={addSuggestedPath}
+            onStartReview={startReview}
+            onApplyResearchUpdate={applyResearchUpdate}
           />
         ) : (
           <>
             <div className="lesson-toolbar">
               <div className="toolbar-start">
                 <button className="icon-action mobile-only" aria-label="Open course outline" onClick={() => setSidebarOpen(true)}><Menu size={18} /></button>
-                <span className="stage-count">{isCurrentConcept ? `Step ${modeIndex + 1} of ${modeItems.length}` : `Concept ${activeConceptIndex + 1} of ${concepts.length}`}</span>
+                <span className="stage-count">Step {modeIndex + 1} of {modeItems.length}</span>
               </div>
-              {isCurrentConcept ? (
-                <div className={"mode-switcher mode-step-" + modeIndex} role="tablist" aria-label="Learning mode">
+              <div className={"mode-switcher mode-step-" + modeIndex} role="tablist" aria-label="Learning mode">
                   {modeItems.map((item) => {
                     const Icon = item.icon;
                     const locked = (item.id === "apply" && !recallComplete) || (item.id === "reflect" && !codePassed);
@@ -316,21 +458,19 @@ export function CurrentWorkspace() {
                       </button>
                     );
                   })}
-                </div>
-              ) : <span className="concept-toolbar-title">{activeConcept.label}</span>}
-              {isCurrentConcept ? (
-                <button className={`notebook-toggle ${notebookOpen ? "active" : ""}`} aria-label={notebookOpen ? "Close notebook" : "Open notebook"} aria-pressed={notebookOpen} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
-              ) : (
-                <button className="notebook-toggle" onClick={() => openLesson(1)}><ArrowLeft size={14} /><span>Current concept</span></button>
-              )}
+              </div>
+              <button className={`notebook-toggle ${notebookOpen ? "active" : ""}`} aria-label={notebookOpen ? "Close notebook" : "Open notebook"} aria-pressed={notebookOpen} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
             </div>
 
             <div className="lesson-scroll" ref={lessonScrollRef}>
               <div className="mode-stage">
-                {!isCurrentConcept ? <ConceptOverview concept={activeConcept} index={activeConceptIndex} /> : null}
-                {isCurrentConcept && mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} /> : null}
-                {isCurrentConcept && mode === "recall" ? (
+                {mode === "read" ? (isCompactionLesson
+                  ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} />
+                  : <GenericReadModule concept={activeConcept} path={activePath} addToNotes={() => { setNotes((value) => value.includes(activeConcept.objective) ? value : value ? `${value}\n\n${activeConcept.objective}` : activeConcept.objective); setNotebookOpen(true); }} next={() => transitionToMode("recall")} />) : null}
+                {mode === "recall" ? (
                   <RecallModule
+                    concept={activeConcept}
+                    compaction={isCompactionLesson}
                     answer={recallAnswer}
                     setAnswer={setRecallAnswer}
                     evaluation={evaluation}
@@ -342,7 +482,7 @@ export function CurrentWorkspace() {
                     next={() => transitionToMode("apply")}
                   />
                 ) : null}
-                {isCurrentConcept && mode === "apply" ? (
+                {mode === "apply" ? (isCompactionLesson ? (
                   <ApplyModule
                     choice={codeChoice}
                     setChoice={(choice) => { setCodeChoice(choice); setCodeChecked(false); }}
@@ -350,13 +490,27 @@ export function CurrentWorkspace() {
                     check={checkCode}
                     next={() => transitionToMode("reflect")}
                   />
-                ) : null}
-                {isCurrentConcept && mode === "reflect" ? (
+                ) : (
+                  <GenericApplyModule
+                    concept={activeConcept}
+                    answer={applicationAnswer}
+                    setAnswer={(value) => { setApplicationAnswer(value); setApplicationChecked(false); setApplicationPassed(false); }}
+                    checked={applicationChecked}
+                    passed={applicationPassed}
+                    check={checkApplication}
+                    next={() => transitionToMode("reflect")}
+                  />
+                )) : null}
+                {mode === "reflect" ? (
                   <ReflectModule
+                    concept={activeConcept}
                     reflection={reflection}
                     setReflection={setReflection}
-                    nextReview={nextReview}
+                    nextReview={scheduledReviewAt}
                     schedule={finishAndSchedule}
+                    finished={lessonFinished}
+                    nextLabel={completionNextIndex !== null ? `Continue to ${activePath.concepts[completionNextIndex]?.title}` : queue.length ? "Start next path" : "Return to map"}
+                    continueNext={continueAfterCompletion}
                   />
                 ) : null}
               </div>
@@ -368,13 +522,13 @@ export function CurrentWorkspace() {
       <aside className={`notebook-panel ${notebookOpen ? "open" : ""}`} aria-hidden={!notebookOpen}>
         <div className="notes-pane">
           <div className="note-document-title">
-            <div><span>Compaction notes</span><small>Saved on this device</small></div>
+            <div><span>{activeConcept.title} notes</span><small>Saved on this device</small></div>
           </div>
           <textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             tabIndex={notebookOpen ? 0 : -1}
-            placeholder={"Write while you learn…\n\nTry explaining the purpose of compaction without copying the source."}
+            placeholder={`Write while you learn…\n\nExplain ${activeConcept.title.toLowerCase()} in your own words.`}
             aria-label="Learning notes"
           />
           <div className="note-footer">
@@ -387,28 +541,56 @@ export function CurrentWorkspace() {
   );
 }
 
-function ConceptOverview({ concept, index }: { concept: CourseConcept; index: number }) {
-  const statusLabel = concept.status === "done" ? "Completed" : concept.status === "next" ? "Up next" : "Later in this path";
+function sanitizeProgress(value: unknown): Record<string, PathProgress> {
+  if (!value || typeof value !== "object") return defaultProgress;
+  const entries = Object.entries(value).filter((entry): entry is [string, PathProgress] => {
+    const item = entry[1] as Partial<PathProgress> | null;
+    return Boolean(item && Number.isInteger(item.currentConceptIndex) && Array.isArray(item.completedConceptIndexes));
+  });
+  return { ...defaultProgress, ...Object.fromEntries(entries) };
+}
 
+function sanitizeTextRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}
+
+function isStoredReview(value: unknown): value is ReviewItem {
+  if (!value || typeof value !== "object") return false;
+  const review = value as Partial<ReviewItem>;
+  return typeof review.id === "string"
+    && typeof review.pathId === "string"
+    && Number.isInteger(review.conceptIndex)
+    && typeof review.dueAt === "string"
+    && !Number.isNaN(new Date(review.dueAt).getTime())
+    && (review.reason === "completion" || review.reason === "research")
+    && Boolean(review.memory && typeof review.memory.intervalDays === "number" && typeof review.memory.ease === "number" && typeof review.memory.repetitions === "number");
+}
+
+function GenericReadModule({ concept, path, addToNotes, next }: { concept: LearningConcept; path: LearningPath; addToNotes: () => void; next: () => void }) {
+  const checkpoints = concept.checkpoints?.length ? concept.checkpoints : [concept.objective];
   return (
-    <article className="lesson-module concept-overview-module">
+    <article className="lesson-module read-module">
       <header className="module-header">
-        <div className="concept-overview-meta"><span>{statusLabel}</span><span>Concept {index + 1} of {concepts.length}</span></div>
-        <h1>{concept.label}</h1>
-        <p>{concept.summary}</p>
+        <h1>{concept.title}</h1>
+        <p>{concept.summary ?? concept.objective}</p>
       </header>
       <section className="concept-overview-objective">
         <span>Learning objective</span>
         <p>{concept.objective}</p>
       </section>
       <section className="concept-overview-checkpoints">
-        <h2>What connects here</h2>
+        <h2>Build the mental model</h2>
         <ol>
-          {concept.checkpoints.map((checkpoint, checkpointIndex) => (
-            <li key={checkpoint}><span>{checkpointIndex + 1}</span><strong>{checkpoint}</strong></li>
-          ))}
+          {checkpoints.map((checkpoint, index) => <li key={checkpoint}><span>{index + 1}</span><strong>{checkpoint}</strong></li>)}
         </ol>
       </section>
+      <section className="source-excerpt generic-source-note">
+        <div className="excerpt-top"><span><FileText size={14} /> {path.sources?.length ? `${path.sources.length} source${path.sources.length === 1 ? "" : "s"} connected` : "Path objective"}</span></div>
+        <blockquote>{concept.objective}</blockquote>
+        <button className="excerpt-action" onClick={addToNotes}><Highlighter size={14} /> Add to notes</button>
+      </section>
+      <footer className="module-footer"><span>Next, reconstruct the idea without looking back.</span><button className="continue-button" onClick={next}>Start recall <ArrowRight size={15} /></button></footer>
     </article>
   );
 }
@@ -452,6 +634,8 @@ function ReadModule({ highlighted, addToNotes, next }: { highlighted: boolean; a
 }
 
 function RecallModule(props: {
+  concept: LearningConcept;
+  compaction: boolean;
   answer: string;
   setAnswer: (value: string) => void;
   evaluation: Evaluation | null;
@@ -467,15 +651,15 @@ function RecallModule(props: {
     <article className="lesson-module recall-module">
       <header className="module-header compact-header">
         <h1>Rebuild the idea from memory.</h1>
-        <p>What triggers server-side compaction, what does it preserve, and what should the next request contain when using <code>previous_response_id</code>?</p>
+        <p>{props.compaction ? <>What triggers server-side compaction, what does it preserve, and what should the next request contain when using <code>previous_response_id</code>?</> : props.concept.objective}</p>
       </header>
 
-      {props.supportMode === "visual" ? <VisualSupport /> : null}
-      {props.supportMode === "example" ? <ExampleSupport /> : null}
+      {props.supportMode === "visual" ? <VisualSupport concept={props.concept} compaction={props.compaction} /> : null}
+      {props.supportMode === "example" ? <ExampleSupport concept={props.concept} compaction={props.compaction} /> : null}
 
       <label className="recall-input">
         <span>Your explanation</span>
-        <textarea value={props.answer} onChange={(event) => props.setAnswer(event.target.value)} disabled={Boolean(props.evaluation)} placeholder="Compaction happens when…" />
+        <textarea value={props.answer} onChange={(event) => props.setAnswer(event.target.value)} disabled={Boolean(props.evaluation)} placeholder={`Explain ${props.concept.title.toLowerCase()} without looking back…`} />
         <small>{props.answer.length} characters</small>
       </label>
 
@@ -497,18 +681,19 @@ function RecallModule(props: {
 
       <footer className="module-footer">
         {props.evaluation ? <button className="subtle-button" onClick={props.reset}><RotateCcw size={14} /> Try again</button> : <span>Current checks the concept, not exact wording.</span>}
-        {props.evaluation && !needsSupport ? <button className="continue-button" onClick={props.next}>Apply it in code <ArrowRight size={15} /></button> : <button className="continue-button" disabled={!props.answer.trim() || props.isEvaluating || Boolean(props.evaluation)} onClick={props.evaluate}>{props.isEvaluating ? "Checking…" : "Check understanding"}<Send size={14} /></button>}
+        {props.evaluation && !needsSupport ? <button className="continue-button" onClick={props.next}>Apply it <ArrowRight size={15} /></button> : <button className="continue-button" disabled={!props.answer.trim() || props.isEvaluating || Boolean(props.evaluation)} onClick={props.evaluate}>{props.isEvaluating ? "Checking…" : "Check understanding"}<Send size={14} /></button>}
       </footer>
     </article>
   );
 }
 
-function VisualSupport() {
-  return <div className="support-module"><span className="support-label">Visual sequence</span><div className="support-steps"><div><small>1</small><strong>Watch token count</strong></div><ChevronRight size={16} /><div><small>2</small><strong>Cross threshold</strong></div><ChevronRight size={16} /><div><small>3</small><strong>Emit compact item</strong></div><ChevronRight size={16} /><div><small>4</small><strong>Send new turn</strong></div></div><p>The compact item carries forward the useful state. With <code>previous_response_id</code>, your application adds only the new user message.</p></div>;
+function VisualSupport({ concept, compaction }: { concept: LearningConcept; compaction: boolean }) {
+  const steps = compaction ? ["Watch token count", "Cross threshold", "Emit compact item", "Send new turn"] : concept.checkpoints?.slice(0, 4) ?? [concept.objective];
+  return <div className="support-module"><span className="support-label">Visual sequence</span><div className="support-steps">{steps.map((step, index) => <div className="support-step-wrap" key={step}>{index ? <ChevronRight size={16} /> : null}<div><small>{index + 1}</small><strong>{step}</strong></div></div>)}</div><p>{compaction ? <>The compact item carries forward the useful state. With <code>previous_response_id</code>, your application adds only the new user message.</> : concept.summary ?? concept.objective}</p></div>;
 }
 
-function ExampleSupport() {
-  return <div className="support-module example-support"><span className="support-label">Concrete example</span><p>Imagine a coding agent has completed 80 tool calls. The transcript crosses your token threshold. The server replaces older context with an opaque compact item, returns it in the stream, and continues. On the next turn, your app sends “Now add tests” with the previous response ID; it does not rebuild or prune the history itself.</p></div>;
+function ExampleSupport({ concept, compaction }: { concept: LearningConcept; compaction: boolean }) {
+  return <div className="support-module example-support"><span className="support-label">Concrete example</span><p>{compaction ? "Imagine a coding agent has completed 80 tool calls. The transcript crosses your token threshold. The server replaces older context with an opaque compact item, returns it in the stream, and continues. On the next turn, your app sends a new request with the previous response ID; it does not rebuild or prune the history itself." : `Imagine you need to use ${concept.title.toLowerCase()} in a real project. Start by identifying the decision described here: ${concept.objective}`}</p></div>;
 }
 
 function ApplyModule({ choice, setChoice, checked, check, next }: { choice: number | null; setChoice: (choice: number) => void; checked: boolean; check: () => void; next: () => void }) {
@@ -538,27 +723,42 @@ function ApplyModule({ choice, setChoice, checked, check, next }: { choice: numb
   );
 }
 
-function ReflectModule({ reflection, setReflection, nextReview, schedule }: { reflection: string; setReflection: (value: string) => void; nextReview: string | null; schedule: () => void }) {
+function GenericApplyModule({ concept, answer, setAnswer, checked, passed, check, next }: { concept: LearningConcept; answer: string; setAnswer: (value: string) => void; checked: boolean; passed: boolean; check: () => void; next: () => void }) {
+  return (
+    <article className="lesson-module apply-module">
+      <header className="module-header compact-header">
+        <h1>Use {concept.title.toLowerCase()} in a concrete decision.</h1>
+        <p>Describe a realistic situation, the choice you would make, and why this concept changes that choice.</p>
+      </header>
+      <label className="recall-input application-input"><span>Your application</span><textarea value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="In a real project, I would…" /><small>{answer.trim().length} characters</small></label>
+      {checked ? <div className={passed ? "code-feedback success" : "code-feedback error"}>{passed ? <CheckCircle2 size={16} /> : <CircleHelp size={16} />}<p><strong>{passed ? "The concept is attached to a decision." : "Make the application more concrete."}</strong>{passed ? "You named enough context to revisit and challenge this choice later." : "Include the situation, your choice, and the reason behind it."}</p></div> : null}
+      <footer className="module-footer"><span>Application turns recognition into usable knowledge.</span>{passed ? <button className="continue-button" onClick={next}>Reflect and schedule <ArrowRight size={15} /></button> : <button className="continue-button" disabled={!answer.trim()} onClick={check}>Check application <Play size={13} /></button>}</footer>
+    </article>
+  );
+}
+
+function ReflectModule({ concept, reflection, setReflection, nextReview, schedule, finished, nextLabel, continueNext }: { concept: LearningConcept; reflection: string; setReflection: (value: string) => void; nextReview: string | null; schedule: () => void; finished: boolean; nextLabel: string; continueNext: () => void }) {
   const reviewDate = nextReview ? new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(nextReview)) : null;
   return (
     <article className="lesson-module reflect-module">
       <header className="module-header compact-header">
         <h1>Connect it to something you would build.</h1>
-        <p>Name one situation where you would choose server-side compaction and one implementation mistake you now know to avoid.</p>
+        <p>What changed in your understanding of {concept.title.toLowerCase()}, and what would you watch for when using it?</p>
       </header>
       <label className="recall-input reflection-input"><span>Your reflection</span><textarea value={reflection} onChange={(event) => setReflection(event.target.value)} placeholder="I would use this when…" /><small>Saved on this device.</small></label>
       <div className="session-summary">
         <div><Check size={14} /><span><strong>Read</strong>Source-backed mental model</span></div>
-        <div><Check size={14} /><span><strong>Recalled</strong>Trigger, preserved state, next turn</span></div>
-        <div><Check size={14} /><span><strong>Applied</strong>Correct API configuration</span></div>
+        <div><Check size={14} /><span><strong>Recalled</strong>{concept.objective}</span></div>
+        <div><Check size={14} /><span><strong>Applied</strong>A concrete decision</span></div>
       </div>
-      {reviewDate ? <div className="scheduled-state"><CheckCircle2 size={18} /><div><strong>Review scheduled for {reviewDate}</strong><span>You will reconstruct the API shape without choices.</span></div></div> : null}
-      <footer className="module-footer"><span>{reviewDate ? "Concept complete. The review date is saved on this device." : "Finish with one effortful review tomorrow."}</span><button className="continue-button" disabled={!reflection.trim() || Boolean(reviewDate)} onClick={schedule}>{reviewDate ? "Scheduled" : "Finish and schedule review"}<Check size={14} /></button></footer>
+      {reviewDate ? <div className="scheduled-state"><CheckCircle2 size={18} /><div><strong>Review scheduled for {reviewDate}</strong><span>You will reconstruct the idea without choices.</span></div></div> : null}
+      <footer className="module-footer"><span>{reviewDate ? "Concept complete. Progress and review timing are saved." : "Finish with one effortful review tomorrow."}</span>{finished ? <button className="continue-button" onClick={continueNext}>{nextLabel}<ArrowRight size={14} /></button> : <button className="continue-button" disabled={!reflection.trim()} onClick={schedule}>Finish and schedule review<Check size={14} /></button>}</footer>
     </article>
   );
 }
 
-function localEvaluation(answer: string): Evaluation {
+function localEvaluation(answer: string, concept: LearningConcept): Evaluation {
+  if (concept.title !== "Compaction") return genericLocalEvaluation(answer, concept);
   const normalized = answer.toLowerCase();
   const threshold = normalized.includes("threshold") || normalized.includes("token");
   const preserves = normalized.includes("preserv") || normalized.includes("state") || normalized.includes("reasoning");
@@ -570,6 +770,25 @@ function localEvaluation(answer: string): Evaluation {
     feedback: score >= 75 ? "You connected the threshold, preserved state, and next-turn behavior. The wording is yours, but the mechanism is intact." : "Your answer has part of the mechanism. Reconstruct the full sequence: trigger, compact item, then the next request.",
     misconception: score >= 75 ? null : !threshold ? "Compaction is triggered by a configured rendered-token threshold." : !preserves ? "The opaque item preserves key prior state and reasoning; it is not merely deleted history." : "With previous_response_id, send only the new user message and do not manually prune.",
     nextPrompt: score >= 75 ? "Apply the documented request shape." : "Try the concept as a visual sequence.",
+    mode: "demo",
+  };
+}
+
+function genericLocalEvaluation(answer: string, concept: LearningConcept): Evaluation {
+  const normalized = answer.toLowerCase();
+  const rubric = [concept.objective, ...(concept.checkpoints ?? [])].join(" ").toLowerCase();
+  const stopWords = new Set(["about", "after", "before", "between", "choose", "define", "explain", "from", "into", "that", "their", "this", "using", "what", "when", "where", "which", "while", "with", "without", "your"]);
+  const rubricTerms = [...new Set(rubric.match(/[a-z][a-z0-9_-]{3,}/g) ?? [])].filter((word) => !stopWords.has(word));
+  const matchedTerms = rubricTerms.filter((word) => normalized.includes(word));
+  const coverage = rubricTerms.length ? matchedTerms.length / Math.min(rubricTerms.length, 8) : 0;
+  const score = Math.min(94, Math.round(38 + Math.min(answer.trim().length, 160) / 5 + Math.min(coverage, 1) * 28));
+  const passed = score >= 75;
+  return {
+    score,
+    verdict: passed ? "You rebuilt the core idea" : "Add the missing relationship",
+    feedback: passed ? "Your explanation connects the concept to its purpose in your own wording." : `Your answer is moving in the right direction. Explain how ${concept.title.toLowerCase()} changes a decision or outcome.`,
+    misconception: passed ? null : concept.checkpoints?.find((checkpoint) => !normalized.includes(checkpoint.split(" ")[0].toLowerCase())) ?? concept.objective,
+    nextPrompt: passed ? "Apply the idea to a concrete situation." : "Use the visual sequence, then try again.",
     mode: "demo",
   };
 }

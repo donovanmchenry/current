@@ -1,6 +1,8 @@
 export type LearningConcept = {
   title: string;
   objective: string;
+  summary?: string;
+  checkpoints?: string[];
 };
 
 export type LearningSource = {

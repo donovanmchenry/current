@@ -9,7 +9,13 @@ type Evaluation = {
   mode: "live" | "demo";
 };
 
-function demoEvaluation(answer: string): Evaluation {
+type RecallRubric = {
+  concept: string;
+  objective: string;
+  checkpoints: string[];
+};
+
+function compactionEvaluation(answer: string): Evaluation {
   const normalized = answer.toLowerCase();
   const mentionsTrigger = normalized.includes("threshold") || normalized.includes("token count") || normalized.includes("context limit");
   const mentionsPreservedState = normalized.includes("state") || normalized.includes("reasoning") || normalized.includes("context");
@@ -43,6 +49,36 @@ function demoEvaluation(answer: string): Evaluation {
   };
 }
 
+function genericEvaluation(answer: string, rubric: RecallRubric): Evaluation {
+  const normalized = answer.toLowerCase();
+  const rubricText = [rubric.objective, ...rubric.checkpoints].join(" ").toLowerCase();
+  const stopWords = new Set(["about", "after", "before", "between", "choose", "define", "explain", "from", "into", "that", "their", "this", "using", "what", "when", "where", "which", "while", "with", "without", "your"]);
+  const rubricTerms = [...new Set(rubricText.match(/[a-z][a-z0-9_-]{3,}/g) ?? [])].filter((word) => !stopWords.has(word));
+  const matchedTerms = rubricTerms.filter((word) => normalized.includes(word));
+  const coverage = rubricTerms.length ? matchedTerms.length / Math.min(rubricTerms.length, 8) : 0;
+  const score = Math.min(94, Math.round(38 + Math.min(answer.length, 160) / 5 + Math.min(coverage, 1) * 28));
+  const passed = score >= 75;
+  const missingCheckpoint = rubric.checkpoints.find((checkpoint) => {
+    const firstUsefulWord = checkpoint.toLowerCase().match(/[a-z][a-z0-9_-]{3,}/)?.[0];
+    return firstUsefulWord ? !normalized.includes(firstUsefulWord) : false;
+  });
+
+  return {
+    score,
+    verdict: passed ? "You rebuilt the core idea" : "Add the missing relationship",
+    feedback: passed
+      ? "Your explanation connects the concept to its purpose in your own wording."
+      : `Explain how ${rubric.concept.toLowerCase()} changes a decision or outcome, not only what it is called.`,
+    misconception: passed ? null : missingCheckpoint ?? rubric.objective,
+    nextPrompt: passed ? "Apply the idea to a concrete situation." : "Use the visual sequence, then try again.",
+    mode: "demo",
+  };
+}
+
+function demoEvaluation(answer: string, rubric: RecallRubric): Evaluation {
+  return rubric.concept.toLowerCase() === "compaction" ? compactionEvaluation(answer) : genericEvaluation(answer, rubric);
+}
+
 function outputText(result: unknown): string | null {
   if (!result || typeof result !== "object") return null;
   const response = result as { output_text?: unknown; output?: unknown };
@@ -64,12 +100,17 @@ function outputText(result: unknown): string | null {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { answer?: string };
+  const body = (await request.json()) as { answer?: string; concept?: string; objective?: string; checkpoints?: unknown };
   const answer = body.answer?.trim() ?? "";
   if (!answer) return NextResponse.json({ error: "Answer is required" }, { status: 400 });
+  const rubric: RecallRubric = {
+    concept: body.concept?.trim().slice(0, 120) || "Compaction",
+    objective: body.objective?.trim().slice(0, 500) || "Explain when compaction runs, what its opaque item preserves, and what the next chained request contains.",
+    checkpoints: Array.isArray(body.checkpoints) ? body.checkpoints.filter((item): item is string => typeof item === "string").map((item) => item.slice(0, 240)).slice(0, 8) : [],
+  };
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return NextResponse.json(demoEvaluation(answer));
+  if (!apiKey) return NextResponse.json(demoEvaluation(answer, rubric));
 
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
@@ -84,11 +125,11 @@ export async function POST(request: Request) {
         input: [
           {
             role: "system",
-            content: "You are Current's concise recall evaluator. Grade only these three ideas: server-side compaction runs when rendered token count crosses the configured compact_threshold; it returns an opaque item that preserves key prior state and reasoning with fewer tokens; when chaining with previous_response_id, the next request should contain only the new user message and should not manually prune the chain. Do not require claims beyond this rubric.",
+            content: "You are Current's concise active-recall evaluator. Grade the learner only against the supplied concept, objective, and checkpoints. Reward accurate relationships expressed in the learner's own words. Do not require facts outside the rubric. A score of 75 means the learner has the operating idea and can move to application.",
           },
           {
             role: "user",
-            content: `Evaluate this learner answer: ${answer}`,
+            content: JSON.stringify({ rubric, learnerAnswer: answer.slice(0, 4000) }),
           },
         ],
         text: {
@@ -121,6 +162,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ...evaluation, mode: "live" });
   } catch (error) {
     console.error("Live evaluation failed; using deterministic fallback", error);
-    return NextResponse.json(demoEvaluation(answer));
+    return NextResponse.json(demoEvaluation(answer, rubric));
   }
 }

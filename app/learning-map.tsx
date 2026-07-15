@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  CalendarClock,
   Check,
   CirclePlus,
   Clock3,
@@ -35,8 +36,10 @@ import {
 } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { CreatePathDialog } from "./create-path-dialog";
+import { suggestedPath } from "@/lib/learning-catalog";
 import type { LearningPath } from "@/lib/learning-path";
+import { isDue, progressForPath, type PathProgress, type ReviewItem } from "@/lib/learning-runtime";
+import { CreatePathDialog } from "./create-path-dialog";
 
 type MapMode = "map" | "list";
 type ProposalStatus = "ready" | "applied" | "dismissed";
@@ -50,112 +53,78 @@ type LearningNodeData = Record<string, unknown> & {
   current?: boolean;
   changed?: boolean;
   changeLabel?: "Added" | "Created" | "Updated";
-  planned?: boolean;
+  queuePosition?: number;
 };
 
 type LearningNode = Node<LearningNodeData, "learning">;
 
-const basePaths: LearningPath[] = [
-  {
-    id: "long-running",
-    title: "Long-running agents",
-    description: "Context, compaction, chaining, and recovery for agents that work across many turns.",
-    progress: 38,
-    concepts: [
-      { title: "Conversation state", objective: "Explain what state a long-running agent must carry between turns." },
-      { title: "Compaction", objective: "Explain when compaction runs and what its opaque item preserves." },
-      { title: "Stateless chaining", objective: "Choose the correct next request shape when using previous_response_id." },
-      { title: "Recovery patterns", objective: "Recover an interrupted agent without replaying unnecessary context." },
-      { title: "Implementation check", objective: "Configure and verify compaction in a working agent loop." },
-    ],
-    next: "Compaction",
-    status: "In progress",
-  },
-  {
-    id: "responses-api",
-    title: "Responses API foundations",
-    description: "The request, response, tool, and state primitives behind OpenAI agent systems.",
-    progress: 64,
-    concepts: [
-      { title: "Response objects", objective: "Read the core state carried by a response object." },
-      { title: "Tool calls", objective: "Connect model tool requests to application-side execution." },
-      { title: "Structured outputs", objective: "Constrain model output to a validated schema." },
-      { title: "Error recovery", objective: "Handle failed requests and tool results without losing state." },
-    ],
-    next: "Error recovery",
-    status: "2 reviews due",
-  },
-  {
-    id: "agent-evals",
-    title: "Agent evaluations",
-    description: "Build repeatable evaluation sets for reasoning traces, tools, and multi-step outcomes.",
-    progress: 21,
-    concepts: [
-      { title: "Eval design", objective: "Define an evaluation around a concrete agent behavior." },
-      { title: "Trace grading", objective: "Grade the decisions and tool use inside an agent trace." },
-      { title: "Regression sets", objective: "Turn representative failures into repeatable tests." },
-      { title: "Failure taxonomies", objective: "Classify failures precisely enough to guide fixes." },
-      { title: "Human review", objective: "Place human judgment where automated grading is insufficient." },
-      { title: "Release gates", objective: "Use evaluation results to make a release decision." },
-    ],
-    next: "Trace grading",
-    status: "In progress",
-  },
-];
-
-const suggestedPath: LearningPath = {
-  id: "agent-reliability",
-  title: "Agent reliability",
-  description: "Turn tool failures, recovery patterns, and evaluations into resilient production behavior.",
-  progress: 0,
-  concepts: [
-    { title: "Tool failure modes", objective: "Distinguish retryable tool failures from terminal ones." },
-    { title: "Retry policy", objective: "Choose bounded retry behavior for common agent failures." },
-    { title: "Human handoff", objective: "Escalate an agent task with the context a person needs." },
-    { title: "Reliability budgets", objective: "Set measurable reliability targets for an agent workflow." },
-  ],
-  next: "Tool failure modes",
-  status: "Added from suggestion",
-};
-
-const mapStorageKey = "current-learning-map-v1";
+const mapUiStorageKey = "current-learning-map-ui-v2";
 const nodeTypes = { learning: LearningGraphNode } satisfies NodeTypes;
 
 type LearningMapProps = {
-  onOpenLesson: (conceptIndex?: number) => void;
+  paths: LearningPath[];
+  activePathId: string;
+  queue: string[];
+  progress: Record<string, PathProgress>;
+  reviews: ReviewItem[];
+  suggestedPathAdded: boolean;
+  onContinueLesson: () => void;
+  onOpenLesson: (pathId: string, conceptIndex: number) => void;
+  onQueuePath: (pathId: string) => void;
+  onAddCustomPath: (path: LearningPath) => void;
+  onRemoveCustomPath: (pathId: string) => void;
+  onAddSuggestedPath: () => void;
+  onStartReview: (review: ReviewItem) => void;
   onApplyResearchUpdate: () => void;
 };
 
-export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMapProps) {
+export function LearningMap({
+  paths,
+  activePathId,
+  queue,
+  progress,
+  reviews,
+  suggestedPathAdded,
+  onContinueLesson,
+  onOpenLesson,
+  onQueuePath,
+  onAddCustomPath,
+  onRemoveCustomPath,
+  onAddSuggestedPath,
+  onStartReview,
+  onApplyResearchUpdate,
+}: LearningMapProps) {
   const [mapMode, setMapMode] = useState<MapMode>("map");
-  const [selectedPathId, setSelectedPathId] = useState("long-running");
-  const [selectedConceptIndex, setSelectedConceptIndex] = useState(1);
+  const [selectedPathId, setSelectedPathId] = useState(activePathId);
+  const [selectedConceptIndex, setSelectedConceptIndex] = useState(() => {
+    const path = paths.find((candidate) => candidate.id === activePathId) ?? paths[0];
+    return progressForPath(path, progress[path.id]).currentConceptIndex;
+  });
   const [proposalStatus, setProposalStatus] = useState<ProposalStatus>("ready");
-  const [suggestionStatus, setSuggestionStatus] = useState<SuggestionStatus>("ready");
+  const [suggestionStatus, setSuggestionStatus] = useState<SuggestionStatus>(suggestedPathAdded ? "added" : "ready");
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [plannedPathId, setPlannedPathId] = useState<string | null>(null);
   const [compactGraph, setCompactGraph] = useState(false);
-  const [customPaths, setCustomPaths] = useState<LearningPath[]>([]);
   const [createPathOpen, setCreatePathOpen] = useState(false);
   const [removePathId, setRemovePathId] = useState<string | null>(null);
   const mapBodyRef = useRef<HTMLDivElement>(null);
   const storageHydratedRef = useRef(false);
 
-  const paths = useMemo(
-    () => [...basePaths, ...(suggestionStatus === "added" ? [suggestedPath] : []), ...customPaths],
-    [customPaths, suggestionStatus],
-  );
-  const selectedPath = paths.find((path) => path.id === selectedPathId) ?? paths[0];
-  const nextConceptIndex = getNextConceptIndex(selectedPath);
-  const inspectedConceptIndex = Math.min(selectedConceptIndex, selectedPath.concepts.length - 1);
+  const selectedPath = paths.find((path) => path.id === selectedPathId) ?? paths.find((path) => path.id === activePathId) ?? paths[0];
+  const effectiveSuggestionStatus: SuggestionStatus = suggestedPathAdded ? "added" : suggestionStatus;
+  const selectedProgress = progressForPath(selectedPath, progress[selectedPath.id]);
+  const inspectedConceptIndex = Math.max(0, Math.min(selectedConceptIndex, selectedPath.concepts.length - 1));
   const inspectedConcept = selectedPath.concepts[inspectedConceptIndex];
-  const inspectedConceptState = inspectedConceptIndex < nextConceptIndex ? "done" : inspectedConceptIndex === nextConceptIndex ? "current" : "upcoming";
-  const inspectedConceptLabel = inspectedConceptState === "done" ? "Completed" : inspectedConceptState === "current" ? (selectedPath.id === "long-running" ? "Current" : "Next") : "Upcoming";
-  const plannedPath = paths.find((path) => path.id === plannedPathId);
-  const pendingUpdates = Number(proposalStatus === "ready") + Number(suggestionStatus === "ready");
+  const inspectedConceptState = selectedProgress.completedConceptIndexes.includes(inspectedConceptIndex)
+    ? "done"
+    : inspectedConceptIndex === selectedProgress.currentConceptIndex ? "current" : "upcoming";
+  const selectedPathIsActive = selectedPath.id === activePathId;
+  const inspectedConceptLabel = inspectedConceptState === "done" ? "Completed" : inspectedConceptState === "current" ? (selectedPathIsActive ? "Current" : "Next") : "Upcoming";
+  const plannedPath = paths.find((path) => path.id === queue[0]);
+  const dueReviews = reviews.filter((review) => isDue(review) && paths.some((path) => path.id === review.pathId));
+  const pendingUpdates = Number(proposalStatus === "ready") + Number(effectiveSuggestionStatus === "ready");
   const nodes = useMemo(
-    () => createNodes(proposalStatus === "applied", paths, plannedPathId, compactGraph),
-    [compactGraph, paths, plannedPathId, proposalStatus],
+    () => createNodes(proposalStatus === "applied", paths, activePathId, queue, compactGraph),
+    [activePathId, compactGraph, paths, proposalStatus, queue],
   );
   const edges = useMemo(() => createEdges(paths), [paths]);
 
@@ -174,45 +143,34 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
-        const saved = JSON.parse(window.localStorage.getItem(mapStorageKey) ?? "null") as {
+        const saved = JSON.parse(window.localStorage.getItem(mapUiStorageKey) ?? "null") as {
           proposalStatus?: ProposalStatus;
           suggestionStatus?: SuggestionStatus;
-          plannedPathId?: string | null;
-          customPaths?: LearningPath[];
         } | null;
-        if (saved?.proposalStatus && ["ready", "applied", "dismissed"].includes(saved.proposalStatus)) {
-          setProposalStatus(saved.proposalStatus);
-        }
-        if (saved?.suggestionStatus && ["ready", "added", "dismissed"].includes(saved.suggestionStatus)) {
-          setSuggestionStatus(saved.suggestionStatus);
-        }
-        if (typeof saved?.plannedPathId === "string" || saved?.plannedPathId === null) {
-          setPlannedPathId(saved.plannedPathId);
-        }
-        if (Array.isArray(saved?.customPaths)) {
-          setCustomPaths(saved.customPaths.filter(isStoredLearningPath).slice(0, 12));
-        }
+        if (saved?.proposalStatus && ["ready", "applied", "dismissed"].includes(saved.proposalStatus)) setProposalStatus(saved.proposalStatus);
+        if (!suggestedPathAdded && saved?.suggestionStatus && ["ready", "dismissed"].includes(saved.suggestionStatus)) setSuggestionStatus(saved.suggestionStatus);
       } catch {
-        window.localStorage.removeItem(mapStorageKey);
+        window.localStorage.removeItem(mapUiStorageKey);
       } finally {
         storageHydratedRef.current = true;
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [suggestedPathAdded]);
 
   useEffect(() => {
     if (!storageHydratedRef.current) return;
-    window.localStorage.setItem(mapStorageKey, JSON.stringify({ proposalStatus, suggestionStatus, plannedPathId, customPaths }));
-  }, [customPaths, plannedPathId, proposalStatus, suggestionStatus]);
+    window.localStorage.setItem(mapUiStorageKey, JSON.stringify({ proposalStatus, suggestionStatus }));
+  }, [proposalStatus, suggestionStatus]);
 
   const selectPath = (pathId: string) => {
     setSelectedPathId(pathId);
     const path = paths.find((item) => item.id === pathId);
-    if (path) setSelectedConceptIndex(getNextConceptIndex(path));
+    if (path) setSelectedConceptIndex(progressForPath(path, progress[path.id]).currentConceptIndex);
   };
 
   const addSuggestedPath = () => {
+    onAddSuggestedPath();
     setSuggestionStatus("added");
     setSelectedPathId(suggestedPath.id);
     setSelectedConceptIndex(0);
@@ -220,10 +178,7 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
 
   const dismissSuggestion = () => {
     setSuggestionStatus("dismissed");
-    if (selectedPathId === suggestedPath.id) {
-      setSelectedPathId("long-running");
-      setSelectedConceptIndex(1);
-    }
+    if (selectedPathId === suggestedPath.id) selectPath(activePathId);
   };
 
   const applyProposal = () => {
@@ -235,7 +190,7 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
   };
 
   const addCustomPath = (path: LearningPath) => {
-    setCustomPaths((current) => [...current, path]);
+    onAddCustomPath(path);
     setSelectedPathId(path.id);
     setSelectedConceptIndex(0);
     setMapMode("map");
@@ -243,10 +198,9 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
   };
 
   const removeCustomPath = (pathId: string) => {
-    setCustomPaths((current) => current.filter((path) => path.id !== pathId));
-    setSelectedPathId("long-running");
-    setSelectedConceptIndex(1);
-    setPlannedPathId((current) => current === pathId ? null : current);
+    onRemoveCustomPath(pathId);
+    setSelectedPathId(activePathId === pathId ? "long-running" : activePathId);
+    setSelectedConceptIndex(activePathId === pathId ? 1 : 0);
     setRemovePathId(null);
   };
 
@@ -268,7 +222,7 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
         </div>
         <div className="map-toolbar-actions">
           <button className="create-path-button" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={14} /><span>New path</span></button>
-          <button className="map-return-button" aria-label="Continue lesson" onClick={() => onOpenLesson()}><ArrowLeft size={14} /><span>Continue lesson</span></button>
+          <button className="map-return-button" aria-label="Continue lesson" onClick={onContinueLesson}><ArrowLeft size={14} /><span>Continue lesson</span></button>
         </div>
       </div>
 
@@ -298,16 +252,19 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
             </div>
           ) : (
             <ul className="learning-path-list" aria-label="Learning paths">
-              {paths.map((path) => (
-                <li key={path.id}>
-                  <button className={selectedPath.id === path.id ? "selected" : ""} onClick={() => selectPath(path.id)}>
-                    <span className="path-list-icon"><FolderOpen size={17} /></span>
-                    <span className="path-list-copy"><strong>{path.title}{plannedPathId === path.id ? <em>Next</em> : null}</strong><small>{path.description}</small></span>
-                    <span className="path-list-progress"><span><i style={{ width: `${path.progress}%` }} /></span><small>{path.progress}% · {path.concepts.length} concepts</small></span>
-                    <ArrowRight size={15} />
-                  </button>
-                </li>
-              ))}
+              {paths.map((path) => {
+                const queuePosition = queue.indexOf(path.id);
+                return (
+                  <li key={path.id}>
+                    <button className={selectedPath.id === path.id ? "selected" : ""} onClick={() => selectPath(path.id)}>
+                      <span className="path-list-icon"><FolderOpen size={17} /></span>
+                      <span className="path-list-copy"><strong>{path.title}{queuePosition >= 0 ? <em>{queuePosition === 0 ? "Next" : `Queued ${queuePosition + 1}`}</em> : null}</strong><small>{path.description}</small></span>
+                      <span className="path-list-progress"><span><i style={{ width: `${path.progress}%` }} /></span><small>{path.progress}% · {path.concepts.length} concepts</small></span>
+                      <ArrowRight size={15} />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -323,8 +280,8 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
               <div className="selected-path-outline-heading"><span>Concepts</span><small>{inspectedConceptIndex + 1} of {selectedPath.concepts.length}</small></div>
               <ol>
                 {selectedPath.concepts.map((concept, index) => {
-                  const conceptState = index < nextConceptIndex ? "done" : index === nextConceptIndex ? "current" : "upcoming";
-                  const conceptLabel = conceptState === "done" ? "Completed" : conceptState === "current" ? (selectedPath.id === "long-running" ? "Current" : "Next") : "Upcoming";
+                  const conceptState = selectedProgress.completedConceptIndexes.includes(index) ? "done" : index === selectedProgress.currentConceptIndex ? "current" : "upcoming";
+                  const conceptLabel = conceptState === "done" ? "Completed" : conceptState === "current" ? (selectedPathIsActive ? "Current" : "Next") : "Upcoming";
                   return (
                     <li className={`${conceptState} ${inspectedConceptIndex === index ? "selected" : ""}`} key={`${selectedPath.id}-${concept.title}`}>
                       <button aria-pressed={inspectedConceptIndex === index} onClick={() => setSelectedConceptIndex(index)}>
@@ -341,7 +298,7 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
                 <p>{inspectedConcept.objective}</p>
               </div>
             </div>
-            {selectedPath.userCreated && selectedPath.sources?.length ? (
+            {selectedPath.sources?.length ? (
               <div className="selected-path-sources">
                 <span>Sources</span>
                 <ul>
@@ -354,11 +311,10 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
                 </ul>
               </div>
             ) : null}
-            {selectedPath.id === "long-running" ? (
-              <button className="rail-primary-action" onClick={() => onOpenLesson(inspectedConceptIndex)}><BookOpen size={14} /> {inspectedConceptState === "done" ? "Review" : inspectedConceptState === "current" ? "Continue" : "Preview"} {inspectedConcept.title}</button>
-            ) : (
-              <button className="rail-primary-action" onClick={() => setPlannedPathId((current) => current === selectedPath.id ? null : selectedPath.id)}><Clock3 size={14} />{plannedPathId === selectedPath.id ? "Remove from queue" : "Set as next"}</button>
-            )}
+            <button className="rail-primary-action" onClick={() => onOpenLesson(selectedPath.id, inspectedConceptIndex)}><BookOpen size={14} /> {inspectedConceptState === "done" ? "Review" : inspectedConceptState === "current" && selectedPathIsActive ? "Continue" : "Start"} {inspectedConcept.title}</button>
+            {selectedPath.id !== activePathId ? (
+              <button className="rail-queue-action" onClick={() => onQueuePath(selectedPath.id)}><Clock3 size={13} />{queue.includes(selectedPath.id) ? "Remove from queue" : "Set as next"}</button>
+            ) : null}
             {selectedPath.userCreated ? (
               removePathId === selectedPath.id ? (
                 <div className="remove-path-confirm"><span>Remove this path?</span><div><button onClick={() => removeCustomPath(selectedPath.id)}>Remove</button><button onClick={() => setRemovePathId(null)}>Cancel</button></div></div>
@@ -366,6 +322,21 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
                 <button className="remove-path-button" onClick={() => setRemovePathId(selectedPath.id)}><Trash2 size={13} /> Remove path</button>
               )
             ) : null}
+          </section>
+
+          <section className="review-queue" aria-label="Review queue">
+            <div className="research-heading"><div><CalendarClock size={15} /><span>Review queue</span></div><small>{dueReviews.length} due</small></div>
+            {dueReviews.length ? dueReviews.map((review) => {
+              const path = paths.find((candidate) => candidate.id === review.pathId);
+              const concept = path?.concepts[review.conceptIndex];
+              if (!path || !concept) return null;
+              return (
+                <button className="review-queue-item" onClick={() => onStartReview(review)} key={review.id}>
+                  <span><strong>{concept.title}</strong><small>{path.title}{review.reason === "research" ? " · Source updated" : ""}</small></span>
+                  <ArrowRight size={13} />
+                </button>
+              );
+            }) : <p className="review-queue-empty">Nothing due. Completed concepts will return here.</p>}
           </section>
 
           <section className="research-activity">
@@ -389,13 +360,13 @@ export function LearningMap({ onOpenLesson, onApplyResearchUpdate }: LearningMap
               </div>
             </article>
 
-            <article className={`agent-activity-item ${suggestionStatus}`}>
-              <span className="activity-icon">{suggestionStatus === "added" ? <Check size={15} /> : suggestionStatus === "dismissed" ? <X size={15} /> : <Sparkles size={15} />}</span>
+            <article className={`agent-activity-item ${effectiveSuggestionStatus}`}>
+              <span className="activity-icon">{effectiveSuggestionStatus === "added" ? <Check size={15} /> : effectiveSuggestionStatus === "dismissed" ? <X size={15} /> : <Sparkles size={15} />}</span>
               <div className="activity-content">
-                <strong>{suggestionStatus === "added" ? "Agent reliability added" : suggestionStatus === "dismissed" ? "Suggestion dismissed" : "Suggested learning path"}</strong>
-                <p>{suggestionStatus === "added" ? "The new path is connected to recovery and evaluations." : suggestionStatus === "dismissed" ? "The path can be restored later." : "Agent reliability shares four concepts with your current paths."}</p>
-                {suggestionStatus === "ready" ? <div className="suggestion-actions"><button onClick={addSuggestedPath}><CirclePlus size={12} /> Add path</button><button onClick={dismissSuggestion}>Dismiss</button></div> : null}
-                {suggestionStatus === "dismissed" ? <button className="activity-action" onClick={() => setSuggestionStatus("ready")}><RotateCcw size={12} /> Restore</button> : null}
+                <strong>{effectiveSuggestionStatus === "added" ? "Agent reliability added" : effectiveSuggestionStatus === "dismissed" ? "Suggestion dismissed" : "Suggested learning path"}</strong>
+                <p>{effectiveSuggestionStatus === "added" ? "The new path is connected to recovery and evaluations." : effectiveSuggestionStatus === "dismissed" ? "The path can be restored later." : "Agent reliability shares four concepts with your current paths."}</p>
+                {effectiveSuggestionStatus === "ready" ? <div className="suggestion-actions"><button onClick={addSuggestedPath}><CirclePlus size={12} /> Add path</button><button onClick={dismissSuggestion}>Dismiss</button></div> : null}
+                {effectiveSuggestionStatus === "dismissed" ? <button className="activity-action" onClick={() => setSuggestionStatus("ready")}><RotateCcw size={12} /> Restore</button> : null}
               </div>
             </article>
           </section>
@@ -436,7 +407,7 @@ function LearningGraphNode({ data, selected }: NodeProps<LearningNode>) {
     selected ? "selected" : "",
     data.current ? "current" : "",
     data.changed ? "changed" : "",
-    data.planned ? "planned" : "",
+    data.queuePosition ? "planned" : "",
   ].filter(Boolean).join(" ");
 
   return (
@@ -450,14 +421,14 @@ function LearningGraphNode({ data, selected }: NodeProps<LearningNode>) {
       <small>{data.detail}</small>
       {typeof data.progress === "number" ? <div className="graph-node-progress"><i style={{ width: `${data.progress}%` }} /></div> : null}
       {data.changed ? <span className="node-change-label"><Sparkles size={10} /> {data.changeLabel ?? "Updated"}</span> : null}
-      {data.planned ? <span className="node-plan-label"><Clock3 size={10} /> Next</span> : null}
+      {data.queuePosition ? <span className="node-plan-label"><Clock3 size={10} /> {data.queuePosition === 1 ? "Next" : `Queue ${data.queuePosition}`}</span> : null}
       <Handle id="right" type="source" position={Position.Right} className="learning-node-handle" />
       <Handle id="bottom" type="source" position={Position.Bottom} className="learning-node-handle" />
     </div>
   );
 }
 
-function createNodes(updateApplied: boolean, paths: LearningPath[], plannedPathId: string | null, compact: boolean): LearningNode[] {
+function createNodes(updateApplied: boolean, paths: LearningPath[], activePathId: string, queue: string[], compact: boolean): LearningNode[] {
   const order = new Map([["responses-api", 0], ["long-running", 1], ["agent-evals", 2], ["agent-reliability", 3]]);
   const orderedPaths = [...paths].sort((left, right) => (order.get(left.id) ?? 10) - (order.get(right.id) ?? 10));
 
@@ -470,9 +441,10 @@ function createNodes(updateApplied: boolean, paths: LearningPath[], plannedPathI
     const sourceCount = path.sources?.length ?? 0;
     const detail = path.userCreated
       ? `${sourceCount ? `${sourceCount} source${sourceCount === 1 ? "" : "s"} · ` : ""}${path.concepts.length} concepts`
-      : path.id === "long-running"
-        ? isUpdated ? `Review added · ${path.concepts.length} concepts` : `Current path · ${path.concepts.length} concepts`
-        : isSuggested ? `Added from suggestion · ${path.concepts.length} concepts` : `${path.progress}% mastered · ${path.concepts.length} concepts`;
+      : path.id === activePathId
+        ? `Current path · ${path.concepts.length} concepts`
+        : `${path.progress}% mastered · ${path.concepts.length} concepts`;
+    const queueIndex = queue.indexOf(path.id);
 
     return {
       id: `path-${path.id}`,
@@ -484,10 +456,10 @@ function createNodes(updateApplied: boolean, paths: LearningPath[], plannedPathI
         detail,
         pathId: path.id,
         progress: path.progress,
-        current: path.id === "long-running",
+        current: path.id === activePathId,
         changed: isUpdated || isSuggested || Boolean(path.userCreated),
         changeLabel: path.userCreated ? "Created" : isSuggested ? "Added" : isUpdated ? "Updated" : undefined,
-        planned: plannedPathId === path.id,
+        queuePosition: queueIndex >= 0 ? queueIndex + 1 : undefined,
       },
     } satisfies LearningNode;
   });
@@ -505,23 +477,4 @@ function createEdges(paths: LearningPath[]): Edge[] {
     edges.push({ id: `related-${path.id}`, source: `path-${path.relatedPathId}`, sourceHandle: "bottom", target: `path-${path.id}`, targetHandle: "top", label: "related", type: "smoothstep", className: "learning-edge suggested" });
   }
   return edges;
-}
-
-function getNextConceptIndex(path: LearningPath) {
-  const index = path.concepts.findIndex((concept) => concept.title === path.next);
-  return index >= 0 ? index : 0;
-}
-
-function isStoredLearningPath(value: unknown): value is LearningPath {
-  if (!value || typeof value !== "object") return false;
-  const path = value as Partial<LearningPath>;
-  if (!path.userCreated || typeof path.id !== "string" || !path.id.startsWith("custom-") || typeof path.title !== "string" || typeof path.description !== "string") return false;
-  if (typeof path.progress !== "number" || typeof path.next !== "string" || typeof path.status !== "string" || !Array.isArray(path.concepts) || path.concepts.length < 1) return false;
-  if (!path.concepts.every((concept) => concept && typeof concept.title === "string" && typeof concept.objective === "string")) return false;
-  if (path.sources && (!Array.isArray(path.sources) || !path.sources.every((source) => {
-    if (!source || typeof source.id !== "string" || typeof source.title !== "string" || (source.kind !== "file" && source.kind !== "link")) return false;
-    if (!source.href) return true;
-    try { return new URL(source.href).protocol === "https:"; } catch { return false; }
-  }))) return false;
-  return true;
 }

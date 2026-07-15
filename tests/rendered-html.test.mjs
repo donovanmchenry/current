@@ -89,16 +89,23 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
 test("connects the lesson shell to a functional learning map", async () => {
   const workspace = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
   const map = await readFile(new URL("../app/learning-map.tsx", import.meta.url), "utf8");
+  const runtime = await readFile(new URL("../lib/learning-runtime.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
   assert.match(workspace, /track-title[\s\S]*onClick=\{openLearningMap\}/);
   assert.match(workspace, /setWorkspaceView\("map"\)/);
-  assert.match(workspace, /<LearningMap[\s\S]*onOpenLesson=\{openLesson\}/);
-  assert.match(workspace, /onApplyResearchUpdate=\{finishAndSchedule\}/);
+  assert.match(workspace, /<LearningMap[\s\S]*paths=\{paths\}[\s\S]*queue=\{queue\}[\s\S]*onOpenLesson=\{openLesson\}/);
+  assert.match(workspace, /onStartReview=\{startReview\}/);
+  assert.match(workspace, /onApplyResearchUpdate=\{applyResearchUpdate\}/);
   assert.match(workspace, /workspaceView === "map" \? "map-view"/);
-  assert.match(workspace, /className="concept-row"[\s\S]*onClick=\{\(\) => openLesson\(index\)\}/);
-  assert.match(workspace, /<ConceptOverview concept=\{activeConcept\} index=\{activeConceptIndex\}/);
+  assert.match(workspace, /className="concept-row"[\s\S]*onClick=\{\(\) => openLesson\(activePath\.id, index\)\}/);
+  assert.match(workspace, /<GenericReadModule concept=\{activeConcept\}/);
+  assert.match(workspace, /<GenericApplyModule[\s\S]*concept=\{activeConcept\}/);
   assert.match(workspace, /activeSources\.map\(\(source\)/);
+  assert.match(workspace, /setProgress[\s\S]*completedConceptIndexes[\s\S]*setReviews/s);
+  assert.match(workspace, /nextIncompleteConcept\(activePath/);
+  assert.match(workspace, /current-learning-runtime-v1/);
+  assert.match(workspace, /setQueue\(\(current\) => current\.includes\(pathId\)/);
   assert.match(map, /<ReactFlow[\s\S]*nodes=\{nodes\}[\s\S]*edges=\{edges\}/);
   assert.match(map, /role="tablist" aria-label="Learning map view"/);
   assert.match(map, /setProposalStatus\("applied"\)/);
@@ -107,19 +114,23 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /Set as next/);
   assert.match(map, /Remove from queue/);
   assert.match(map, /New path/);
-  assert.match(map, /customPaths/);
   assert.match(map, /<CreatePathDialog/);
-  assert.match(map, /current-learning-map-v1/);
-  assert.match(map, /window\.localStorage\.setItem\(mapStorageKey/);
+  assert.doesNotMatch(map, /const \[customPaths|const \[plannedPathId/);
   assert.match(map, /mapBodyRef\.current\?\.scrollTo\(\{ top: 0 \}\)/);
   assert.match(map, /setSelectedConceptIndex\(index\)/);
   assert.match(map, /aria-pressed=\{inspectedConceptIndex === index\}/);
-  assert.match(map, /Review" : inspectedConceptState === "current" \? "Continue" : "Preview"/);
+  assert.match(map, /onOpenLesson\(selectedPath\.id, inspectedConceptIndex\)/);
+  assert.match(map, /inspectedConceptState === "current" && selectedPathIsActive \? "Continue" : "Start"/);
+  assert.match(map, /className="review-queue"[\s\S]*onStartReview\(review\)/);
+  assert.match(runtime, /export const defaultReviews/);
+  assert.match(runtime, /export function nextIncompleteConcept/);
+  assert.match(runtime, /export function pathWithProgress/);
   assert.doesNotMatch(map, /Checking official sources|Running now|3 agents|Research active|id: "concept-/);
   assert.match(styles, /\.current-app\.map-view \.course-sidebar[^}]*display:\s*none/s);
   assert.match(styles, /\.concept-row[^}]*cursor:\s*pointer/s);
   assert.match(styles, /\.learning-map-body[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 316px/s);
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
+  assert.match(styles, /\.review-queue-item[^}]*cursor:\s*pointer/s);
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.learning-map-body[^}]*display:\s*block[^}]*overflow-y:\s*auto/s);
 });
 
@@ -188,6 +199,8 @@ test("keeps source-free fallback paths specific and progressive", async () => {
   assert.ok(path.concepts.some((concept) => concept.title === "Replication and consistency"));
   assert.equal(path.concepts.at(-1).title, "Distributed systems in practice");
   assert.ok(path.concepts.every((concept) => !/\bwell\b/i.test(concept.title)));
+  assert.ok(path.concepts.every((concept) => !/^Build an accurate working understanding/i.test(concept.objective)));
+  assert.ok(path.concepts.every((concept) => concept.summary && concept.checkpoints?.length >= 2));
 });
 
 test("returns a deterministic evaluation when no API key is configured", async () => {
@@ -230,5 +243,30 @@ test("identifies the missing link in an incomplete recall answer", async () => {
   const evaluation = await response.json();
   assert.ok(evaluation.score < 75);
   assert.match(evaluation.misconception, /opaque item|next chained request/i);
+  assert.equal(evaluation.mode, "demo");
+});
+
+test("evaluates recall against a non-compaction concept rubric", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-generic-coach`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/api/coach", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        concept: "Trace grading",
+        objective: "Grade the decisions and tool use inside an agent trace.",
+        checkpoints: ["Decision points", "Tool selection", "Intermediate state"],
+        answer: "Trace grading checks decision points, tool selection, and intermediate state so a final success does not hide a poor agent decision.",
+      }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  assert.equal(response.status, 200);
+  const evaluation = await response.json();
+  assert.ok(evaluation.score >= 75);
   assert.equal(evaluation.mode, "demo");
 });
