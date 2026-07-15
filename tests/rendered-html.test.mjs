@@ -70,8 +70,10 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.match(styles, /\.recall-input[^}]*margin-top:\s*0/s);
   assert.match(styles, /\.sidebar-source-item small[^}]*font-size:\s*11px/s);
   assert.match(styles, /\.diagram-stage[^}]*border-radius:\s*8px/s);
+  assert.match(styles, /\.diagram-stage[^}]*box-shadow:\s*inset 0 0 0 1px hsl\(var\(--foreground\) \/ \.07\)/s);
   assert.match(styles, /\.diagram-stage strong[^}]*border-radius:\s*6px/s);
-  assert.match(styles, /\.diagram-stage\.result[^}]*background:\s*#0d0d0d[^}]*box-shadow:\s*none/s);
+  assert.match(styles, /\.diagram-stage\.result[^}]*background:\s*#0d0d0d/s);
+  assert.doesNotMatch(styles, /\.diagram-stage\.result[^}]*var\(--primary\)/s);
   assert.match(styles, /\.diagram-stage\.result strong:first-of-type[^}]*background:\s*#2b2b2b[^}]*box-shadow:\s*none/s);
   assert.match(styles, /\.source-excerpt[^}]*border-radius:\s*4px/s);
   assert.match(styles, /\.code-options button[^}]*border-radius:\s*4px/s);
