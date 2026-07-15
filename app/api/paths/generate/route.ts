@@ -7,7 +7,7 @@ const blockedHeadings = new Set(["about", "contact", "contents", "data", "defini
 const stopWords = new Set([
   "about", "after", "again", "against", "also", "because", "before", "being", "between", "could", "from", "have", "into", "more", "most", "other", "over", "should", "some", "such", "than", "that", "their", "there", "these", "they", "this", "through", "under", "using", "very", "want", "what", "when", "where", "which", "while", "with", "would", "your",
 ]);
-const instructionWords = new Set(["build", "design", "enough", "evaluate", "learn", "small", "understand"]);
+const instructionWords = new Set(["basic", "build", "clearly", "design", "enough", "evaluate", "learn", "simple", "small", "understand", "well"]);
 
 type FetchedSource = {
   url: string;
@@ -207,6 +207,7 @@ function actionConcepts(goal: string) {
 function subjectConcepts(subject: string) {
   const normalized = subject.toLowerCase();
   if (/causal|causality/.test(normalized)) return ["Potential outcomes and counterfactuals", "Confounding and identification", "Directed acyclic graphs", "Adjustment and study design"];
+  if (/distributed system|distributed computing/.test(normalized)) return ["Replication and consistency", "Failure detection and recovery", "Partitioning and consensus", "Architecture tradeoffs"];
   if (/machine learning|neural network|deep learning/.test(normalized)) return ["Features and representations", "Training and generalization", "Loss functions and optimization", "Model evaluation and error analysis"];
   if (/statistics|probability/.test(normalized)) return ["Random variables and distributions", "Sampling and uncertainty", "Estimation and intervals", "Hypothesis tests and model checks"];
   if (/programming|software|coding/.test(normalized)) return ["Data and control flow", "Interfaces and composition", "Testing and debugging", "Building a complete implementation"];
@@ -222,12 +223,18 @@ function buildConcepts(subject: string, goal: string, fetched: FetchedSource[], 
   const sourceHeadings = [...fetched.flatMap((source) => source.headings), ...textFiles.flatMap((source) => source.headings)];
   const fileNames = files.map((file) => cleanHeading(file.name.replace(/\.[^.]+$/, ""))).filter(isUsefulHeading);
   const terms = frequentTerms(`${goal} ${fetched.map((source) => source.text.slice(0, 10_000)).join(" ")} ${textFiles.map((source) => source.text.slice(0, 10_000)).join(" ")}`);
-  const candidates = [`${subjectTitle} foundations`, ...actionConcepts(goal), ...subjectConcepts(subject), ...sourceHeadings, ...fileNames, ...terms, `${subjectTitle} in practice`];
+  const candidates = [`${subjectTitle} foundations`, ...actionConcepts(goal), ...subjectConcepts(subject), ...sourceHeadings, ...fileNames, ...terms];
   const titles: string[] = [];
 
   for (const candidate of candidates) {
     const cleaned = cleanHeading(candidate);
-    if (!cleaned || titles.some((title) => title.toLowerCase() === cleaned.toLowerCase())) continue;
+    const cleanedTokens = cleaned.toLowerCase().match(/[a-z0-9-]+/g)?.filter((word) => word !== "and") ?? [];
+    const repeatsExistingIdea = titles.some((title) => {
+      const titleTokens = title.toLowerCase().match(/[a-z0-9-]+/g)?.filter((word) => word !== "and") ?? [];
+      return title.toLowerCase() === cleaned.toLowerCase()
+        || (cleanedTokens.length > 0 && cleanedTokens.every((word) => titleTokens.includes(word)));
+    });
+    if (!cleaned || repeatsExistingIdea) continue;
     titles.push(cleaned);
     if (titles.length === 5) break;
   }
@@ -237,6 +244,9 @@ function buildConcepts(subject: string, goal: string, fetched: FetchedSource[], 
     if (titles.length === 5) break;
     if (!titles.some((title) => title.toLowerCase() === filler.toLowerCase())) titles.push(filler);
   }
+
+  const practiceTitle = `${subjectTitle} in practice`;
+  if (!titles.some((title) => title.toLowerCase() === practiceTitle.toLowerCase())) titles.push(practiceTitle);
 
   return titles.map((title, index) => ({
     title,

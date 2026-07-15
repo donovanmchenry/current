@@ -159,6 +159,28 @@ test("rejects private learning-path source URLs", async () => {
   assert.match((await response.json()).error, /public HTTPS source/i);
 });
 
+test("keeps source-free fallback paths specific and progressive", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-fallback-path-quality`);
+  const { default: worker } = await import(workerUrl.href);
+  const form = new FormData();
+  form.set("subject", "Distributed systems");
+  form.set("goal", "Understand consistency, replication, and failure recovery well enough to evaluate a basic architecture.");
+
+  const response = await worker.fetch(
+    new Request("http://localhost/api/paths/generate", { method: "POST", body: form }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  assert.equal(response.status, 200);
+  const path = await response.json();
+  assert.equal(path.concepts.length, 6);
+  assert.ok(path.concepts.some((concept) => concept.title === "Replication and consistency"));
+  assert.equal(path.concepts.at(-1).title, "Distributed systems in practice");
+  assert.ok(path.concepts.every((concept) => !/\bwell\b/i.test(concept.title)));
+});
+
 test("returns a deterministic evaluation when no API key is configured", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-api`);
