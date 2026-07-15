@@ -86,6 +86,25 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.doesNotMatch(styles, /text-transform:\s*uppercase/);
 });
 
+test("connects the lesson shell to a functional learning map", async () => {
+  const workspace = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
+  const map = await readFile(new URL("../app/learning-map.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(workspace, /track-title[\s\S]*onClick=\{openLearningMap\}/);
+  assert.match(workspace, /setWorkspaceView\("map"\)/);
+  assert.match(workspace, /<LearningMap[\s\S]*onOpenLesson=\{openLesson\}/);
+  assert.match(map, /<ReactFlow[\s\S]*nodes=\{nodes\}[\s\S]*edges=\{edges\}/);
+  assert.match(map, /role="tablist" aria-label="Learning map view"/);
+  assert.match(map, /setProposalStatus\("applied"\)/);
+  assert.match(map, /setSuggestionStatus\("added"\)/);
+  assert.match(map, /Plan next session/);
+  assert.match(map, /mapBodyRef\.current\?\.scrollTo\(\{ top: 0 \}\)/);
+  assert.match(styles, /\.learning-map-body[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 316px/s);
+  assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
+  assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.learning-map-body[^}]*display:\s*block[^}]*overflow-y:\s*auto/s);
+});
+
 test("returns a deterministic evaluation when no API key is configured", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-api`);

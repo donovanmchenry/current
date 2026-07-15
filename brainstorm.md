@@ -171,6 +171,37 @@ Important: the agents should not just be labels. The UI should show their action
 - Makes Codex/GPT-5.6 usage feel concrete
 - Useful for demo narration
 
+## Wider Product Flow Decision
+
+The course folder opens a Learning Map that connects the focused lesson loop to the learner's wider set of paths. The entire path header is the navigation target, rather than making the folder icon a small isolated control.
+
+The Learning Map should remain useful rather than becoming an ornamental Obsidian-style node cloud:
+
+- Path nodes show the fields the learner is actively pursuing.
+- Concept nodes appear where they clarify prerequisites, overlap, or the next learning action.
+- Edges represent specific relationships such as foundations, shared concepts, and research-backed recommendations.
+- A Map/List segmented control provides both spatial exploration and a fast, accessible scanning view.
+- Selecting a path reveals mastery, the next concept, and an action such as continuing or planning the next session.
+
+Research agents are visible through concrete work rather than avatars or generic activity labels:
+
+- Checking official sources
+- Proposing a source-backed clarification
+- Showing which concept and review schedule would change
+- Suggesting a genuinely adjacent learning path based on concept overlap
+- Adding approved paths directly to the graph
+
+Current may research autonomously, but meaningful learning-path changes remain reviewable. The learner can apply, dismiss, or restore proposals, preserving trust while still demonstrating agentic behavior.
+
+Recommended demo expansion:
+
+1. Finish or pause the Compaction lesson.
+2. Open the Learning Map from the path folder.
+3. Review a source change found by the research agent.
+4. Apply the clarification and see Compaction marked as updated.
+5. Add the suggested Agent reliability path and see it connect to the graph.
+6. Return directly to the Read, Recall, Apply, Reflect loop.
+
 ## MVP Scope
 
 The hackathon MVP should avoid trying to become a full school platform. It should prove one tight loop extremely well.

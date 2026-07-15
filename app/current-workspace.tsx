@@ -24,8 +24,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { scheduleReview } from "../lib/spaced-review";
+import { LearningMap } from "./learning-map";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
+type WorkspaceView = "lesson" | "map";
 
 type Evaluation = {
   score: number;
@@ -67,6 +69,7 @@ const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
 const noteExcerpt = "Compaction preserves key prior state in an opaque item while using fewer tokens.";
 
 export function CurrentWorkspace() {
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("lesson");
   const [mode, setMode] = useState<Mode>("read");
   const [notes, setNotes] = useState("");
   const [recallAnswer, setRecallAnswer] = useState("");
@@ -159,6 +162,18 @@ export function CurrentWorkspace() {
     setNextReview(schedule.nextReview.toISOString());
   };
 
+  const openLearningMap = () => {
+    setNotebookOpen(false);
+    setSourcesOpen(false);
+    setSidebarOpen(false);
+    setWorkspaceView("map");
+  };
+
+  const openLesson = () => {
+    setSidebarOpen(false);
+    setWorkspaceView("lesson");
+  };
+
   return (
     <div className={`current-app ${notebookOpen ? "with-notebook" : ""}`}>
       {sidebarOpen ? <button className="overlay" aria-label="Close course outline" onClick={() => setSidebarOpen(false)} /> : null}
@@ -173,10 +188,11 @@ export function CurrentWorkspace() {
           </span>
           <button className="icon-action mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button>
         </div>
-        <div className="track-title">
+        <button className={`track-title ${workspaceView === "map" ? "active" : ""}`} aria-current={workspaceView === "map" ? "page" : undefined} onClick={openLearningMap}>
           <span className="track-icon"><FolderOpen size={16} /></span>
           <div><strong>Long-running agents</strong><small>OpenAI API · 5 concepts</small></div>
-        </div>
+          <ChevronRight size={14} />
+        </button>
 
         <ol className="concept-path">
           {concepts.map((concept, index) => (
@@ -210,69 +226,75 @@ export function CurrentWorkspace() {
       </aside>
 
       <main className="learning-canvas">
-        <div className="lesson-toolbar">
-          <div className="toolbar-start">
-            <button className="icon-action mobile-only" aria-label="Open course outline" onClick={() => setSidebarOpen(true)}><Menu size={18} /></button>
-            <span className="stage-count">Step {modeIndex + 1} of {modeItems.length}</span>
-          </div>
-          <div className={"mode-switcher mode-step-" + modeIndex} role="tablist" aria-label="Learning mode">
-            {modeItems.map((item) => {
-              const Icon = item.icon;
-              const locked = (item.id === "apply" && !recallComplete) || (item.id === "reflect" && !codePassed);
-              return (
-                <button
-                  role="tab"
-                  aria-selected={mode === item.id}
-                  disabled={locked}
-                  className={mode === item.id ? "active" : ""}
-                  onClick={() => transitionToMode(item.id)}
-                  aria-label={locked ? `${item.label} locked` : item.label}
-                  title={item.label}
-                  key={item.id}
-                >
-                  <Icon size={14} />{item.label}
-                </button>
-              );
-            })}
-          </div>
-          <button className={`notebook-toggle ${notebookOpen ? "active" : ""}`} aria-label={notebookOpen ? "Close notebook" : "Open notebook"} aria-pressed={notebookOpen} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
-        </div>
+        {workspaceView === "map" ? (
+          <LearningMap onOpenLesson={openLesson} onOpenSidebar={() => setSidebarOpen(true)} />
+        ) : (
+          <>
+            <div className="lesson-toolbar">
+              <div className="toolbar-start">
+                <button className="icon-action mobile-only" aria-label="Open course outline" onClick={() => setSidebarOpen(true)}><Menu size={18} /></button>
+                <span className="stage-count">Step {modeIndex + 1} of {modeItems.length}</span>
+              </div>
+              <div className={"mode-switcher mode-step-" + modeIndex} role="tablist" aria-label="Learning mode">
+                {modeItems.map((item) => {
+                  const Icon = item.icon;
+                  const locked = (item.id === "apply" && !recallComplete) || (item.id === "reflect" && !codePassed);
+                  return (
+                    <button
+                      role="tab"
+                      aria-selected={mode === item.id}
+                      disabled={locked}
+                      className={mode === item.id ? "active" : ""}
+                      onClick={() => transitionToMode(item.id)}
+                      aria-label={locked ? `${item.label} locked` : item.label}
+                      title={item.label}
+                      key={item.id}
+                    >
+                      <Icon size={14} />{item.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <button className={`notebook-toggle ${notebookOpen ? "active" : ""}`} aria-label={notebookOpen ? "Close notebook" : "Open notebook"} aria-pressed={notebookOpen} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
+            </div>
 
-        <div className="lesson-scroll" ref={lessonScrollRef}>
-          <div className="mode-stage">
-            {mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} /> : null}
-            {mode === "recall" ? (
-              <RecallModule
-                answer={recallAnswer}
-                setAnswer={setRecallAnswer}
-                evaluation={evaluation}
-                evaluate={evaluateRecall}
-                isEvaluating={isEvaluating}
-                supportMode={supportMode}
-                setSupportMode={setSupportMode}
-                reset={resetRecall}
-                next={() => transitionToMode("apply")}
-              />
-            ) : null}
-            {mode === "apply" ? (
-              <ApplyModule
-                choice={codeChoice}
-                setChoice={(choice) => { setCodeChoice(choice); setCodeChecked(false); }}
-                checked={codeChecked}
-                check={checkCode}
-                next={() => transitionToMode("reflect")}
-              />
-            ) : null}
-            {mode === "reflect" ? (
-              <ReflectModule
-                reflection={reflection}
-                setReflection={setReflection}
-                nextReview={nextReview}
-                schedule={finishAndSchedule}
-              />
-            ) : null}
-          </div>
-        </div>
+            <div className="lesson-scroll" ref={lessonScrollRef}>
+              <div className="mode-stage">
+                {mode === "read" ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} /> : null}
+                {mode === "recall" ? (
+                  <RecallModule
+                    answer={recallAnswer}
+                    setAnswer={setRecallAnswer}
+                    evaluation={evaluation}
+                    evaluate={evaluateRecall}
+                    isEvaluating={isEvaluating}
+                    supportMode={supportMode}
+                    setSupportMode={setSupportMode}
+                    reset={resetRecall}
+                    next={() => transitionToMode("apply")}
+                  />
+                ) : null}
+                {mode === "apply" ? (
+                  <ApplyModule
+                    choice={codeChoice}
+                    setChoice={(choice) => { setCodeChoice(choice); setCodeChecked(false); }}
+                    checked={codeChecked}
+                    check={checkCode}
+                    next={() => transitionToMode("reflect")}
+                  />
+                ) : null}
+                {mode === "reflect" ? (
+                  <ReflectModule
+                    reflection={reflection}
+                    setReflection={setReflection}
+                    nextReview={nextReview}
+                    schedule={finishAndSchedule}
+                  />
+                ) : null}
+              </div>
+            </div>
+          </>
+        )}
       </main>
 
       <aside className={`notebook-panel ${notebookOpen ? "open" : ""}`} aria-hidden={!notebookOpen}>
