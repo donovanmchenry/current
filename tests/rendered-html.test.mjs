@@ -114,10 +114,12 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /setQueue\(\(current\) => current\.includes\(pathId\)/);
   assert.match(map, /<ReactFlow[\s\S]*nodes=\{nodes\}[\s\S]*edges=\{edges\}/);
   assert.match(map, /role="tablist" aria-label="Learning map view"/);
+  assert.match(map, /const switchMapMode = \(nextMode: MapMode\) =>/);
+  assert.match(map, /map-transition-\$\{mapTransitionDirection\}/);
   assert.match(map, /type MapMode = "map" \| "list" \| "updates" \| "notes"/);
   assert.match(map, /aria-selected=\{mapMode === "updates"\}[\s\S]*Updates/);
-  assert.match(map, /className="agent-updates-view"/);
-  assert.match(map, /className="notes-index-view"/);
+  assert.match(map, /className="agent-updates-view map-view-enter"/);
+  assert.match(map, /className="notes-index-view map-view-enter"/);
   assert.match(map, /aria-label="Search notes"/);
   assert.match(map, /openUpdatedPath\("long-running", 1\)/);
   assert.match(map, /setProposalStatus\("applied"\)/);
@@ -135,7 +137,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /onOpenLesson\(selectedPath\.id, inspectedConceptIndex\)/);
   assert.match(map, /inspectedConceptState === "current" && selectedPathIsActive \? "Continue" : "Start"/);
   assert.match(map, /className="review-queue"[\s\S]*onStartReview\(review\)/);
-  const researchRail = map.match(/<aside className="research-rail">[\s\S]*?<\/aside>/)?.[0] ?? "";
+  const researchRail = map.match(/<aside className="research-rail map-rail-enter">[\s\S]*?<\/aside>/)?.[0] ?? "";
   assert.match(researchRail, /Review queue/);
   assert.doesNotMatch(researchRail, /Agent updates|agent-update-row|research-activity/);
   assert.match(runtime, /export const defaultReviews/);
@@ -150,6 +152,8 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(styles, /\.map-toolbar[^}]*grid-column:\s*1[^}]*grid-row:\s*1/s);
   assert.match(styles, /\.research-rail[^}]*grid-column:\s*2[^}]*grid-row:\s*1 \/ span 2/s);
   assert.match(styles, /\.map-view-switcher[^}]*grid-template-columns:\s*repeat\(4,/s);
+  assert.match(styles, /\.map-view-switcher::before[^}]*transition:\s*transform \.36s cubic-bezier\(\.22, 1, \.36, 1\)/s);
+  assert.match(styles, /@keyframes map-view-forward-in/);
   assert.match(styles, /\.agent-updates-view[^}]*width:\s*min\(760px,/s);
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
   assert.match(styles, /\.review-queue-item[^}]*cursor:\s*pointer/s);

@@ -43,6 +43,7 @@ import { isDue, progressForPath, type LearnerProfile, type PathProgress, type Re
 import { CreatePathDialog } from "./create-path-dialog";
 
 type MapMode = "map" | "list" | "updates" | "notes";
+type MapTransitionDirection = "forward" | "backward";
 type ProposalStatus = "ready" | "applied" | "dismissed";
 type SuggestionStatus = "ready" | "added" | "dismissed";
 
@@ -60,6 +61,7 @@ type LearningNodeData = Record<string, unknown> & {
 type LearningNode = Node<LearningNodeData, "learning">;
 
 const mapUiStorageKey = "current-learning-map-ui-v2";
+const mapModeOrder: MapMode[] = ["map", "list", "updates", "notes"];
 const nodeTypes = { learning: LearningGraphNode } satisfies NodeTypes;
 
 type LearningMapProps = {
@@ -100,6 +102,7 @@ export function LearningMap({
   onApplyResearchUpdate,
 }: LearningMapProps) {
   const [mapMode, setMapMode] = useState<MapMode>("map");
+  const [mapTransitionDirection, setMapTransitionDirection] = useState<MapTransitionDirection>("forward");
   const [selectedPathId, setSelectedPathId] = useState(activePathId);
   const [selectedConceptIndex, setSelectedConceptIndex] = useState(() => {
     const path = paths.find((candidate) => candidate.id === activePathId) ?? paths[0];
@@ -185,12 +188,18 @@ export function LearningMap({
     if (path) setSelectedConceptIndex(progressForPath(path, progress[path.id]).currentConceptIndex);
   };
 
+  const switchMapMode = (nextMode: MapMode) => {
+    if (nextMode === mapMode) return;
+    setMapTransitionDirection(mapModeOrder.indexOf(nextMode) > mapModeOrder.indexOf(mapMode) ? "forward" : "backward");
+    setMapMode(nextMode);
+  };
+
   const addSuggestedPath = () => {
     onAddSuggestedPath();
     setSuggestionStatus("added");
     setSelectedPathId(suggestedPath.id);
     setSelectedConceptIndex(0);
-    setMapMode("map");
+    switchMapMode("map");
   };
 
   const dismissSuggestion = () => {
@@ -204,20 +213,20 @@ export function LearningMap({
     setSelectedPathId("long-running");
     setSelectedConceptIndex(1);
     onApplyResearchUpdate();
-    setMapMode("map");
+    switchMapMode("map");
   };
 
   const openUpdatedPath = (pathId: string, conceptIndex: number) => {
     setSelectedPathId(pathId);
     setSelectedConceptIndex(conceptIndex);
-    setMapMode("map");
+    switchMapMode("map");
   };
 
   const addCustomPath = (path: LearningPath) => {
     onAddCustomPath(path);
     setSelectedPathId(path.id);
     setSelectedConceptIndex(0);
-    setMapMode("map");
+    switchMapMode("map");
     setCreatePathOpen(false);
   };
 
@@ -240,20 +249,20 @@ export function LearningMap({
           <span className="map-toolbar-divider" aria-hidden="true" />
           <span className="map-toolbar-title"><Network size={15} /><span>Learning map</span></span>
         </div>
-        <div className="map-view-switcher" role="tablist" aria-label="Learning map view">
-          <button role="tab" aria-selected={mapMode === "map"} className={mapMode === "map" ? "active" : ""} onClick={() => setMapMode("map")}><Network size={14} /> Map</button>
-          <button role="tab" aria-selected={mapMode === "list"} className={mapMode === "list" ? "active" : ""} onClick={() => setMapMode("list")}><List size={14} /> List</button>
-          <button role="tab" aria-selected={mapMode === "updates"} className={mapMode === "updates" ? "active" : ""} onClick={() => setMapMode("updates")}><Activity size={14} /> Updates{pendingUpdates ? <span className="updates-tab-count">{pendingUpdates}</span> : null}</button>
-          <button role="tab" aria-selected={mapMode === "notes"} className={mapMode === "notes" ? "active" : ""} onClick={() => setMapMode("notes")}><NotebookPen size={14} /> Notes{noteEntries.length ? <span className="updates-tab-count">{noteEntries.length}</span> : null}</button>
+        <div className={`map-view-switcher mode-${mapMode}`} role="tablist" aria-label="Learning map view">
+          <button role="tab" aria-selected={mapMode === "map"} className={mapMode === "map" ? "active" : ""} onClick={() => switchMapMode("map")}><Network size={14} /> Map</button>
+          <button role="tab" aria-selected={mapMode === "list"} className={mapMode === "list" ? "active" : ""} onClick={() => switchMapMode("list")}><List size={14} /> List</button>
+          <button role="tab" aria-selected={mapMode === "updates"} className={mapMode === "updates" ? "active" : ""} onClick={() => switchMapMode("updates")}><Activity size={14} /> Updates{pendingUpdates ? <span className="updates-tab-count">{pendingUpdates}</span> : null}</button>
+          <button role="tab" aria-selected={mapMode === "notes"} className={mapMode === "notes" ? "active" : ""} onClick={() => switchMapMode("notes")}><NotebookPen size={14} /> Notes{noteEntries.length ? <span className="updates-tab-count">{noteEntries.length}</span> : null}</button>
         </div>
         <div className="map-toolbar-actions">
           <button className="create-path-button" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={14} /><span>New path</span></button>
         </div>
       </div>
 
-      <div className={`learning-map-body ${mapMode === "updates" || mapMode === "notes" ? "updates-mode" : ""}`} ref={mapBodyRef}>
+      <div className={`learning-map-body map-transition-${mapTransitionDirection} ${mapMode === "updates" || mapMode === "notes" ? "updates-mode" : ""}`} ref={mapBodyRef}>
         {mapMode === "updates" ? (
-          <section className="agent-updates-view" aria-label="Agent updates">
+          <section className="agent-updates-view map-view-enter" aria-label="Agent updates">
             <header className="agent-updates-header">
               <div><h1>Agent updates</h1><p>Source changes and path suggestions awaiting your decision.</p></div>
               <span>{pendingUpdates ? `${pendingUpdates} pending` : "Up to date"}</span>
@@ -294,7 +303,7 @@ export function LearningMap({
             </div>
           </section>
         ) : mapMode === "notes" ? (
-          <section className="notes-index-view" aria-label="Learning notes">
+          <section className="notes-index-view map-view-enter" aria-label="Learning notes">
             <header className="notes-index-header">
               <div><h1>Notes</h1><p>Ideas captured across every learning path.</p></div>
               <span>{noteEntries.length} note{noteEntries.length === 1 ? "" : "s"} · {learnerProfile.recallAttempts} recall{learnerProfile.recallAttempts === 1 ? "" : "s"}</span>
@@ -311,7 +320,7 @@ export function LearningMap({
           </section>
         ) : (
           <>
-        <div className="map-primary">
+        <div className="map-primary map-view-enter" key={mapMode}>
           {mapMode === "map" ? (
             <div className="graph-canvas">
               <ReactFlow
@@ -328,7 +337,7 @@ export function LearningMap({
                 onNodeClick={(_, node) => selectPath(node.data.pathId)}
                 aria-label="Connected learning paths"
               >
-                <FitGraph version={`${effectiveProposalStatus}-${paths.map((path) => path.id).join(":")}-${compactGraph ? "compact" : "wide"}`} />
+                <FitGraph version={`${mapMode}-${effectiveProposalStatus}-${paths.map((path) => path.id).join(":")}-${compactGraph ? "compact" : "wide"}`} />
                 <Background color="#242424" gap={28} size={1} />
                 <Controls showInteractive={false} />
               </ReactFlow>
@@ -353,7 +362,7 @@ export function LearningMap({
           )}
         </div>
 
-        <aside className="research-rail">
+        <aside className="research-rail map-rail-enter">
           <section className="selected-path-panel">
             <span className="rail-label">Selected path</span>
             <div className="selected-path-title"><FolderOpen size={16} /><div><strong>{selectedPath.title}</strong><small>{selectedPath.status}</small></div></div>
