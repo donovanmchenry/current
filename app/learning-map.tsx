@@ -115,7 +115,6 @@ export function LearningMap({
   const [createPathOpen, setCreatePathOpen] = useState(false);
   const [noteQuery, setNoteQuery] = useState("");
   const [removePathId, setRemovePathId] = useState<string | null>(null);
-  const mapBodyRef = useRef<HTMLDivElement>(null);
   const storageHydratedRef = useRef(false);
 
   const selectedPath = paths.find((path) => path.id === selectedPathId) ?? paths.find((path) => path.id === activePathId) ?? paths[0];
@@ -133,6 +132,7 @@ export function LearningMap({
   const plannedPath = paths.find((path) => path.id === queue[0]);
   const dueReviews = reviews.filter((review) => isDue(review) && paths.some((path) => path.id === review.pathId));
   const pendingUpdates = Number(effectiveProposalStatus === "ready") + Number(effectiveSuggestionStatus === "ready");
+  const fullViewActive = mapMode === "updates" || mapMode === "notes";
   const noteEntries = useMemo(() => paths.flatMap((path) => path.concepts.flatMap((concept, conceptIndex) => {
     const text = notesByConcept[`${path.id}:${conceptIndex}`]?.trim();
     return text ? [{ path, concept, conceptIndex, text }] : [];
@@ -146,10 +146,6 @@ export function LearningMap({
     [activePathId, compactGraph, effectiveProposalStatus, paths, queue],
   );
   const edges = useMemo(() => createEdges(paths), [paths]);
-
-  useEffect(() => {
-    mapBodyRef.current?.scrollTo({ top: 0 });
-  }, [mapMode]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 720px)");
@@ -238,7 +234,7 @@ export function LearningMap({
   };
 
   return (
-    <section className={`learning-map-shell ${mapMode === "updates" || mapMode === "notes" ? "updates-view" : ""}`} aria-label="Learning map">
+    <section className={`learning-map-shell ${fullViewActive ? "updates-view" : ""}`} aria-label="Learning map">
       <div className="map-toolbar">
         <div className="map-toolbar-start">
           <span className="map-wordmark">
@@ -252,7 +248,7 @@ export function LearningMap({
         <div className={`map-view-switcher mode-${mapMode}`} role="tablist" aria-label="Learning map view">
           <button role="tab" aria-selected={mapMode === "map"} className={mapMode === "map" ? "active" : ""} onClick={() => switchMapMode("map")}><Network size={14} /> Map</button>
           <button role="tab" aria-selected={mapMode === "list"} className={mapMode === "list" ? "active" : ""} onClick={() => switchMapMode("list")}><List size={14} /> List</button>
-          <button role="tab" aria-selected={mapMode === "updates"} className={mapMode === "updates" ? "active" : ""} onClick={() => switchMapMode("updates")}><Activity size={14} /> Updates{pendingUpdates ? <span className="updates-tab-count">{pendingUpdates}</span> : null}</button>
+          <button role="tab" aria-label={pendingUpdates ? `Updates, ${pendingUpdates} pending` : "Updates"} aria-selected={mapMode === "updates"} className={mapMode === "updates" ? "active" : ""} onClick={() => switchMapMode("updates")}><Activity size={14} /> Updates{pendingUpdates ? <span className="updates-tab-dot" aria-hidden="true" /> : null}</button>
           <button role="tab" aria-selected={mapMode === "notes"} className={mapMode === "notes" ? "active" : ""} onClick={() => switchMapMode("notes")}><NotebookPen size={14} /> Notes{noteEntries.length ? <span className="updates-tab-count">{noteEntries.length}</span> : null}</button>
         </div>
         <div className="map-toolbar-actions">
@@ -260,7 +256,8 @@ export function LearningMap({
         </div>
       </div>
 
-      <div className={`learning-map-body map-transition-${mapTransitionDirection} ${mapMode === "updates" || mapMode === "notes" ? "updates-mode" : ""}`} ref={mapBodyRef}>
+      <div className={`learning-map-body map-transition-${mapTransitionDirection} ${fullViewActive ? "map-full-mode" : ""}`}>
+        <div className={`map-full-view ${fullViewActive ? "active" : ""}`} aria-hidden={!fullViewActive}>
         {mapMode === "updates" ? (
           <section className="agent-updates-view map-view-enter" aria-label="Agent updates">
             <header className="agent-updates-header">
@@ -318,11 +315,11 @@ export function LearningMap({
               )) : <div className="notes-index-empty"><NotebookPen size={18} /><strong>{noteQuery ? "No matching notes" : "No notes yet"}</strong><p>{noteQuery ? "Try another search." : "Add a note from any lesson and it will appear here."}</p></div>}
             </div>
           </section>
-        ) : (
-          <>
-        <div className="map-primary map-view-enter" key={mapMode}>
-          {mapMode === "map" ? (
-            <div className="graph-canvas">
+        ) : null}
+        </div>
+
+        <div className={`map-primary ${fullViewActive ? "workspace-hidden" : "workspace-active"}`}>
+            <div className={`graph-canvas map-surface ${mapMode === "map" ? "active" : ""}`} aria-hidden={mapMode !== "map"}>
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -337,14 +334,13 @@ export function LearningMap({
                 onNodeClick={(_, node) => selectPath(node.data.pathId)}
                 aria-label="Connected learning paths"
               >
-                <FitGraph version={`${mapMode}-${effectiveProposalStatus}-${paths.map((path) => path.id).join(":")}-${compactGraph ? "compact" : "wide"}`} />
+                <FitGraph version={`${effectiveProposalStatus}-${paths.map((path) => path.id).join(":")}-${compactGraph ? "compact" : "wide"}`} />
                 <Background color="#242424" gap={28} size={1} />
                 <Controls showInteractive={false} />
               </ReactFlow>
               <div className="graph-status"><span>{paths.length} paths</span><span>{paths.reduce((total, path) => total + path.concepts.length, 0)} concepts</span>{plannedPath ? <span>Next: {plannedPath.title}</span> : null}</div>
             </div>
-          ) : (
-            <ul className="learning-path-list" aria-label="Learning paths">
+            <ul className={`learning-path-list map-surface ${mapMode === "list" ? "active" : ""}`} aria-hidden={mapMode !== "list"} aria-label="Learning paths">
               {paths.map((path) => {
                 const queuePosition = queue.indexOf(path.id);
                 return (
@@ -359,10 +355,9 @@ export function LearningMap({
                 );
               })}
             </ul>
-          )}
         </div>
 
-        <aside className="research-rail map-rail-enter">
+        <aside className={`research-rail map-rail-enter ${fullViewActive ? "workspace-hidden" : "workspace-active"}`}>
           <section className="selected-path-panel">
             <span className="rail-label">Selected path</span>
             <div className="selected-path-title"><FolderOpen size={16} /><div><strong>{selectedPath.title}</strong><small>{selectedPath.status}</small></div></div>
@@ -433,8 +428,6 @@ export function LearningMap({
           </section>
 
         </aside>
-          </>
-        )}
       </div>
       <CreatePathDialog open={createPathOpen} onClose={() => setCreatePathOpen(false)} onCreate={addCustomPath} />
     </section>
