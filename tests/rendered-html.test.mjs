@@ -76,6 +76,8 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.doesNotMatch(styles, /\.diagram-stage\.result[^}]*var\(--primary\)/s);
   assert.match(styles, /\.diagram-stage\.result strong:first-of-type[^}]*background:\s*#2b2b2b[^}]*box-shadow:\s*none/s);
   assert.match(styles, /\.source-excerpt[^}]*border-radius:\s*4px/s);
+  assert.match(styles, /\.source-excerpt[^}]*box-shadow:\s*inset 0 0 0 1px hsl\(var\(--foreground\) \/ \.07\)/s);
+  assert.match(styles, /\.comparison-row > div[^}]*box-shadow:\s*inset 0 0 0 1px hsl\(var\(--foreground\) \/ \.07\)/s);
   assert.match(styles, /\.code-options button[^}]*border-radius:\s*4px/s);
   assert.doesNotMatch(styles, /\.(?:diagram-stage|source-excerpt|evaluation-result|support-module|code-feedback|scheduled-state)[^}]*border-left/s);
   assert.doesNotMatch(styles, /view-transition|mode-enter-(?:forward|backward)|\.mode-stage[^}]*transform/);

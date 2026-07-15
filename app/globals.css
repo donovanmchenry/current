@@ -210,7 +210,7 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .diagram-stage.result strong:first-of-type { color: var(--text); background: #2b2b2b; box-shadow: none; }
 .diagram-arrow { display: grid; justify-items: center; gap: 5px; color: var(--text-muted); }
 .diagram-arrow span { font-size: 10px; white-space: nowrap; }
-.source-excerpt { margin: 32px 0 0; padding: 16px; border: 0; border-radius: 4px; background: #0d0d0d; box-shadow: none; }
+.source-excerpt { margin: 32px 0 0; padding: 16px; border: 0; border-radius: 4px; background: #0d0d0d; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); }
 .source-excerpt + .reading-section { margin-top: 32px; }
 .excerpt-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .excerpt-top > span, .excerpt-top a { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
@@ -222,7 +222,7 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .excerpt-action.added { color: var(--text-muted); }
 .excerpt-action:disabled { cursor: default; }
 .comparison-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.comparison-row > div { padding: 15px; border-radius: 4px; background: #0d0d0d; }
+.comparison-row > div { padding: 15px; border-radius: 4px; background: #0d0d0d; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); }
 .comparison-row > div + div { border-left: 0; }
 .comparison-row span { display: block; margin-bottom: 8px; color: var(--text); font-size: 13px; font-weight: 550; }
 .comparison-row p { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
