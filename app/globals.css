@@ -207,7 +207,7 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .diagram-stage > span { margin-bottom: 5px; color: var(--text-muted); font-size: 11px; }
 .diagram-stage strong { padding: 6px 8px; border-radius: 6px; color: var(--text-secondary); background: hsl(var(--muted)); font-size: 12px; font-weight: 480; }
 .diagram-stage.result { background: #0d0d0d; box-shadow: none; }
-.diagram-stage.result strong:first-of-type { color: var(--text); background: #2b2b2b; box-shadow: inset 0 0 0 1px hsl(var(--primary) / .72); }
+.diagram-stage.result strong:first-of-type { color: var(--text); background: #2b2b2b; box-shadow: none; }
 .diagram-arrow { display: grid; justify-items: center; gap: 5px; color: var(--text-muted); }
 .diagram-arrow span { font-size: 10px; white-space: nowrap; }
 .source-excerpt { margin: 32px 0 0; padding: 16px; border: 0; border-radius: 4px; background: #0d0d0d; box-shadow: none; }
