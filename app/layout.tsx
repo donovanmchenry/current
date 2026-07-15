@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Current · Keep your knowledge current",
     description: "A dark, adaptive learning workspace for understanding fast-changing fields through reading, recall, application, and reflection.",
     icons: {
-      icon: [{ url: `${origin}/icon.svg`, type: "image/svg+xml" }],
+      icon: [{ url: `${origin}/current-icon.svg`, type: "image/svg+xml" }],
     },
     openGraph: {
       title: "Current",
