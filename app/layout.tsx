@@ -9,13 +9,17 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3001";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const isLocal = host.startsWith("localhost") || host.startsWith("127.0.0.1") || host.startsWith("[::1]");
+  const protocol = requestHeaders.get("x-forwarded-proto") ?? (isLocal ? "http" : "https");
   const origin = `${protocol}://${host}`;
 
   return {
     metadataBase: new URL(origin),
     title: "Current · Keep your knowledge current",
     description: "A dark, adaptive learning workspace for understanding fast-changing fields through reading, recall, application, and reflection.",
+    icons: {
+      icon: [{ url: `${origin}/icon.svg`, type: "image/svg+xml" }],
+    },
     openGraph: {
       title: "Current",
       description: "Learn what changed. Prove what you understand.",

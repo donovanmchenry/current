@@ -22,6 +22,7 @@ import {
   Send,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { scheduleReview } from "../lib/spaced-review";
 
@@ -165,7 +166,7 @@ export function CurrentWorkspace() {
       <button className={`notebook-overlay ${notebookOpen ? "open" : ""}`} aria-label="Close notebook" aria-hidden={!notebookOpen} tabIndex={notebookOpen ? 0 : -1} onClick={() => setNotebookOpen(false)} />
 
       <aside className={`course-sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="sidebar-brand"><span>Current</span><button className="icon-action mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button></div>
+        <div className="sidebar-brand"><span className="sidebar-wordmark"><Image src="/icon.svg" width={20} height={20} alt="" aria-hidden="true" priority unoptimized />Current</span><button className="icon-action mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button></div>
         <div className="track-title">
           <span className="track-icon"><FolderOpen size={16} /></span>
           <div><strong>Long-running agents</strong><small>OpenAI API · 5 concepts</small></div>

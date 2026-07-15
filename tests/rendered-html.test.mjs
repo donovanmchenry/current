@@ -21,6 +21,7 @@ test("server-renders the Current product shell", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Current · Keep your knowledge current<\/title>/i);
+  assert.match(html, /<link[^>]+rel="icon"[^>]+href="[^"]*\/icon\.svg"[^>]*>/i);
   assert.match(html, /Long-running agents/);
   assert.match(html, /What compaction actually preserves/);
   assert.match(html, /Recall/);
@@ -36,6 +37,7 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
 
   assert.match(source, /sidebar-sources-viewport \$\{sourcesOpen \? "open"/);
   assert.match(source, /course-sidebar[\s\S]*sidebar-brand[\s\S]*Current/);
+  assert.match(source, /sidebar-wordmark[\s\S]*src="\/icon\.svg"/);
   assert.doesNotMatch(source, /workspace-header|AI agent engineering|Long-running agent context|Concept 2 of 5/);
   assert.match(source, /aria-pressed=\{notebookOpen\}/);
   assert.match(source, /notebook-panel \$\{notebookOpen \? "open".*aria-hidden=\{!notebookOpen\}/s);
@@ -60,6 +62,8 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.match(styles, /\.sidebar-brand[^}]*border-bottom:\s*0/s);
   assert.match(styles, /@font-face[^}]*font-family:\s*"OpenAI Sans"[^}]*OpenAISans-Semibold\.woff2[^}]*font-weight:\s*600/s);
   assert.match(styles, /\.sidebar-brand[^}]*color:\s*var\(--text\)[^}]*font-family:\s*"OpenAI Sans"[^}]*font-size:\s*20px[^}]*font-weight:\s*600/s);
+  assert.match(styles, /\.sidebar-wordmark[^}]*gap:\s*8px/s);
+  assert.match(styles, /\.sidebar-wordmark img[^}]*width:\s*20px[^}]*height:\s*20px/s);
   assert.match(styles, /\.diagram-stage[^}]*border-radius:\s*8px/s);
   assert.match(styles, /\.diagram-stage strong[^}]*border-radius:\s*6px/s);
   assert.match(styles, /\.diagram-stage\.result[^}]*background:\s*#0d0d0d[^}]*box-shadow:\s*inset 0 0 0 1px hsl\(var\(--primary\) \/ \.38\)/s);
