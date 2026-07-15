@@ -49,6 +49,8 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.match(styles, /:focus-visible.*outline: 2px solid hsl\(var\(--ring\)\)/s);
   assert.match(styles, /\.mode-switcher[^}]*border-radius:\s*999px/s);
   assert.match(styles, /\.mode-switcher::before[^}]*transition:\s*transform/s);
+  assert.match(styles, /\.lesson-toolbar[^}]*background:\s*hsl\(var\(--background\) \/ \.58\)[^}]*backdrop-filter:\s*blur\(18px\) saturate\(140%\)/s);
+  assert.match(styles, /\.lesson-scroll[^}]*inset:\s*0[^}]*padding-top:\s*54px/s);
   assert.match(styles, /\.sidebar-brand[^}]*border-bottom:\s*0/s);
   assert.match(styles, /@font-face[^}]*font-family:\s*"OpenAI Sans"[^}]*OpenAISans-Semibold\.woff2[^}]*font-weight:\s*600/s);
   assert.match(styles, /\.sidebar-brand[^}]*color:\s*var\(--text\)[^}]*font-family:\s*"OpenAI Sans"[^}]*font-size:\s*20px[^}]*font-weight:\s*600/s);
