@@ -10,12 +10,16 @@ import {
   Clock3,
   ExternalLink,
   FileDiff,
+  FileText,
   FolderOpen,
+  Link2,
   List,
   Menu,
   Network,
+  Plus,
   RotateCcw,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -32,19 +36,12 @@ import {
 } from "@xyflow/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { CreatePathDialog } from "./create-path-dialog";
+import type { LearningPath } from "@/lib/learning-path";
+
 type MapMode = "map" | "list";
 type ProposalStatus = "ready" | "applied" | "dismissed";
 type SuggestionStatus = "ready" | "added" | "dismissed";
-
-type LearningPath = {
-  id: string;
-  title: string;
-  description: string;
-  progress: number;
-  concepts: string[];
-  next: string;
-  status: string;
-};
 
 type LearningNodeData = Record<string, unknown> & {
   title: string;
@@ -53,7 +50,7 @@ type LearningNodeData = Record<string, unknown> & {
   progress?: number;
   current?: boolean;
   changed?: boolean;
-  changeLabel?: "Added" | "Updated";
+  changeLabel?: "Added" | "Created" | "Updated";
   planned?: boolean;
 };
 
@@ -65,7 +62,13 @@ const basePaths: LearningPath[] = [
     title: "Long-running agents",
     description: "Context, compaction, chaining, and recovery for agents that work across many turns.",
     progress: 38,
-    concepts: ["Conversation state", "Compaction", "Stateless chaining", "Recovery patterns", "Implementation check"],
+    concepts: [
+      { title: "Conversation state", objective: "Explain what state a long-running agent must carry between turns." },
+      { title: "Compaction", objective: "Explain when compaction runs and what its opaque item preserves." },
+      { title: "Stateless chaining", objective: "Choose the correct next request shape when using previous_response_id." },
+      { title: "Recovery patterns", objective: "Recover an interrupted agent without replaying unnecessary context." },
+      { title: "Implementation check", objective: "Configure and verify compaction in a working agent loop." },
+    ],
     next: "Compaction",
     status: "In progress",
   },
@@ -74,7 +77,12 @@ const basePaths: LearningPath[] = [
     title: "Responses API foundations",
     description: "The request, response, tool, and state primitives behind OpenAI agent systems.",
     progress: 64,
-    concepts: ["Response objects", "Tool calls", "Structured outputs", "Error recovery"],
+    concepts: [
+      { title: "Response objects", objective: "Read the core state carried by a response object." },
+      { title: "Tool calls", objective: "Connect model tool requests to application-side execution." },
+      { title: "Structured outputs", objective: "Constrain model output to a validated schema." },
+      { title: "Error recovery", objective: "Handle failed requests and tool results without losing state." },
+    ],
     next: "Error recovery",
     status: "2 reviews due",
   },
@@ -83,7 +91,14 @@ const basePaths: LearningPath[] = [
     title: "Agent evaluations",
     description: "Build repeatable evaluation sets for reasoning traces, tools, and multi-step outcomes.",
     progress: 21,
-    concepts: ["Eval design", "Trace grading", "Regression sets", "Failure taxonomies", "Human review", "Release gates"],
+    concepts: [
+      { title: "Eval design", objective: "Define an evaluation around a concrete agent behavior." },
+      { title: "Trace grading", objective: "Grade the decisions and tool use inside an agent trace." },
+      { title: "Regression sets", objective: "Turn representative failures into repeatable tests." },
+      { title: "Failure taxonomies", objective: "Classify failures precisely enough to guide fixes." },
+      { title: "Human review", objective: "Place human judgment where automated grading is insufficient." },
+      { title: "Release gates", objective: "Use evaluation results to make a release decision." },
+    ],
     next: "Trace grading",
     status: "In progress",
   },
@@ -94,7 +109,12 @@ const suggestedPath: LearningPath = {
   title: "Agent reliability",
   description: "Turn tool failures, recovery patterns, and evaluations into resilient production behavior.",
   progress: 0,
-  concepts: ["Tool failure modes", "Retry policy", "Human handoff", "Reliability budgets"],
+  concepts: [
+    { title: "Tool failure modes", objective: "Distinguish retryable tool failures from terminal ones." },
+    { title: "Retry policy", objective: "Choose bounded retry behavior for common agent failures." },
+    { title: "Human handoff", objective: "Escalate an agent task with the context a person needs." },
+    { title: "Reliability budgets", objective: "Set measurable reliability targets for an agent workflow." },
+  ],
   next: "Tool failure modes",
   status: "Added from suggestion",
 };
@@ -116,21 +136,24 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
   const [reviewOpen, setReviewOpen] = useState(false);
   const [plannedPathId, setPlannedPathId] = useState<string | null>(null);
   const [compactGraph, setCompactGraph] = useState(false);
+  const [customPaths, setCustomPaths] = useState<LearningPath[]>([]);
+  const [createPathOpen, setCreatePathOpen] = useState(false);
+  const [removePathId, setRemovePathId] = useState<string | null>(null);
   const mapBodyRef = useRef<HTMLDivElement>(null);
   const storageHydratedRef = useRef(false);
 
   const paths = useMemo(
-    () => suggestionStatus === "added" ? [...basePaths, suggestedPath] : basePaths,
-    [suggestionStatus],
+    () => [...basePaths, ...(suggestionStatus === "added" ? [suggestedPath] : []), ...customPaths],
+    [customPaths, suggestionStatus],
   );
   const selectedPath = paths.find((path) => path.id === selectedPathId) ?? paths[0];
   const plannedPath = paths.find((path) => path.id === plannedPathId);
   const pendingUpdates = Number(proposalStatus === "ready") + Number(suggestionStatus === "ready");
   const nodes = useMemo(
-    () => createNodes(proposalStatus === "applied", suggestionStatus === "added", plannedPathId, compactGraph),
-    [compactGraph, plannedPathId, proposalStatus, suggestionStatus],
+    () => createNodes(proposalStatus === "applied", paths, plannedPathId, compactGraph),
+    [compactGraph, paths, plannedPathId, proposalStatus],
   );
-  const edges = useMemo(() => createEdges(suggestionStatus === "added"), [suggestionStatus]);
+  const edges = useMemo(() => createEdges(paths), [paths]);
 
   useEffect(() => {
     mapBodyRef.current?.scrollTo({ top: 0 });
@@ -151,6 +174,7 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
           proposalStatus?: ProposalStatus;
           suggestionStatus?: SuggestionStatus;
           plannedPathId?: string | null;
+          customPaths?: LearningPath[];
         } | null;
         if (saved?.proposalStatus && ["ready", "applied", "dismissed"].includes(saved.proposalStatus)) {
           setProposalStatus(saved.proposalStatus);
@@ -160,6 +184,9 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
         }
         if (typeof saved?.plannedPathId === "string" || saved?.plannedPathId === null) {
           setPlannedPathId(saved.plannedPathId);
+        }
+        if (Array.isArray(saved?.customPaths)) {
+          setCustomPaths(saved.customPaths.filter(isStoredLearningPath).slice(0, 12));
         }
       } catch {
         window.localStorage.removeItem(mapStorageKey);
@@ -172,8 +199,8 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
 
   useEffect(() => {
     if (!storageHydratedRef.current) return;
-    window.localStorage.setItem(mapStorageKey, JSON.stringify({ proposalStatus, suggestionStatus, plannedPathId }));
-  }, [plannedPathId, proposalStatus, suggestionStatus]);
+    window.localStorage.setItem(mapStorageKey, JSON.stringify({ proposalStatus, suggestionStatus, plannedPathId, customPaths }));
+  }, [customPaths, plannedPathId, proposalStatus, suggestionStatus]);
 
   const selectPath = (pathId: string) => {
     setSelectedPathId(pathId);
@@ -196,6 +223,20 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
     onApplyResearchUpdate();
   };
 
+  const addCustomPath = (path: LearningPath) => {
+    setCustomPaths((current) => [...current, path]);
+    setSelectedPathId(path.id);
+    setMapMode("map");
+    setCreatePathOpen(false);
+  };
+
+  const removeCustomPath = (pathId: string) => {
+    setCustomPaths((current) => current.filter((path) => path.id !== pathId));
+    setSelectedPathId("long-running");
+    setPlannedPathId((current) => current === pathId ? null : current);
+    setRemovePathId(null);
+  };
+
   return (
     <section className="learning-map-shell" aria-label="Learning map">
       <div className="map-toolbar">
@@ -208,7 +249,10 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
           <button role="tab" aria-selected={mapMode === "map"} className={mapMode === "map" ? "active" : ""} onClick={() => setMapMode("map")}><Network size={14} /> Map</button>
           <button role="tab" aria-selected={mapMode === "list"} className={mapMode === "list" ? "active" : ""} onClick={() => setMapMode("list")}><List size={14} /> List</button>
         </div>
-        <button className="map-return-button" aria-label="Continue lesson" onClick={onOpenLesson}><ArrowLeft size={14} /><span>Continue lesson</span></button>
+        <div className="map-toolbar-actions">
+          <button className="create-path-button" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={14} /><span>New path</span></button>
+          <button className="map-return-button" aria-label="Continue lesson" onClick={onOpenLesson}><ArrowLeft size={14} /><span>Continue lesson</span></button>
+        </div>
       </div>
 
       <div className="learning-map-body" ref={mapBodyRef}>
@@ -229,7 +273,7 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
                 onNodeClick={(_, node) => selectPath(node.data.pathId)}
                 aria-label="Connected learning paths"
               >
-                <FitGraph version={`${proposalStatus}-${suggestionStatus}-${compactGraph ? "compact" : "wide"}`} />
+                <FitGraph version={`${proposalStatus}-${paths.map((path) => path.id).join(":")}-${compactGraph ? "compact" : "wide"}`} />
                 <Background color="#242424" gap={28} size={1} />
                 <Controls showInteractive={false} />
               </ReactFlow>
@@ -258,11 +302,41 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
             <p>{selectedPath.description}</p>
             <div className="selected-path-progress"><span><i style={{ width: `${selectedPath.progress}%` }} /></span><small>{selectedPath.progress}% mastered</small></div>
             <div className="selected-path-next"><Clock3 size={13} /><span>Next</span><strong>{selectedPath.next}</strong></div>
+            {selectedPath.userCreated ? (
+              <div className="selected-path-outline">
+                <span>Concepts</span>
+                <ol>
+                  {selectedPath.concepts.map((concept, index) => (
+                    <li key={`${selectedPath.id}-${concept.title}`}><span>{index + 1}</span><div><strong>{concept.title}</strong><p>{concept.objective}</p></div></li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
+            {selectedPath.userCreated && selectedPath.sources?.length ? (
+              <div className="selected-path-sources">
+                <span>Sources</span>
+                <ul>
+                  {selectedPath.sources.map((source) => (
+                    <li key={source.id}>
+                      {source.kind === "link" ? <Link2 size={12} /> : <FileText size={12} />}
+                      {source.href ? <a href={source.href} target="_blank" rel="noreferrer"><strong>{source.title}</strong><small>{source.detail}</small></a> : <div><strong>{source.title}</strong><small>{source.detail}</small></div>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {selectedPath.id === "long-running" ? (
               <button className="rail-primary-action" onClick={onOpenLesson}><BookOpen size={14} /> Continue Compaction</button>
             ) : (
               <button className="rail-primary-action" onClick={() => setPlannedPathId((current) => current === selectedPath.id ? null : selectedPath.id)}><Clock3 size={14} />{plannedPathId === selectedPath.id ? "Remove from queue" : "Set as next"}</button>
             )}
+            {selectedPath.userCreated ? (
+              removePathId === selectedPath.id ? (
+                <div className="remove-path-confirm"><span>Remove this path?</span><div><button onClick={() => removeCustomPath(selectedPath.id)}>Remove</button><button onClick={() => setRemovePathId(null)}>Cancel</button></div></div>
+              ) : (
+                <button className="remove-path-button" onClick={() => setRemovePathId(selectedPath.id)}><Trash2 size={13} /> Remove path</button>
+              )
+            ) : null}
           </section>
 
           <section className="research-activity">
@@ -298,6 +372,7 @@ export function LearningMap({ onOpenLesson, onOpenSidebar, onApplyResearchUpdate
           </section>
         </aside>
       </div>
+      <CreatePathDialog open={createPathOpen} onClose={() => setCreatePathOpen(false)} onCreate={addCustomPath} />
     </section>
   );
 }
@@ -353,62 +428,66 @@ function LearningGraphNode({ data, selected }: NodeProps<LearningNode>) {
   );
 }
 
-function createNodes(updateApplied: boolean, suggestionAdded: boolean, plannedPathId: string | null, compact: boolean): LearningNode[] {
-  const positions = compact ? {
-    responses: { x: 25, y: 20 },
-    current: { x: 125, y: 160 },
-    evals: { x: 25, y: 300 },
-    reliability: { x: 125, y: 440 },
-  } : {
-    responses: { x: 30, y: 80 },
-    current: { x: 275, y: 260 },
-    evals: { x: 30, y: 460 },
-    reliability: { x: 275, y: 500 },
-  };
+function createNodes(updateApplied: boolean, paths: LearningPath[], plannedPathId: string | null, compact: boolean): LearningNode[] {
+  const order = new Map([["responses-api", 0], ["long-running", 1], ["agent-evals", 2], ["agent-reliability", 3]]);
+  const orderedPaths = [...paths].sort((left, right) => (order.get(left.id) ?? 10) - (order.get(right.id) ?? 10));
 
-  const nodes: LearningNode[] = [
-    {
-      id: "path-responses",
-      type: "learning",
-      position: positions.responses,
-      ariaLabel: "Responses API foundations learning path",
-      data: { title: "Responses API foundations", detail: "64% mastered · 4 concepts", pathId: "responses-api", progress: 64, planned: plannedPathId === "responses-api" },
-    },
-    {
-      id: "path-long-running",
-      type: "learning",
-      position: positions.current,
-      ariaLabel: "Long-running agents learning path",
-      data: { title: "Long-running agents", detail: updateApplied ? "Review added · 5 concepts" : "Current path · 5 concepts", pathId: "long-running", progress: 38, current: true, changed: updateApplied, changeLabel: updateApplied ? "Updated" : undefined },
-    },
-    {
-      id: "path-evals",
-      type: "learning",
-      position: positions.evals,
-      ariaLabel: "Agent evaluations learning path",
-      data: { title: "Agent evaluations", detail: "21% mastered · 6 concepts", pathId: "agent-evals", progress: 21, planned: plannedPathId === "agent-evals" },
-    },
-  ];
+  return orderedPaths.map((path, index) => {
+    const position = compact
+      ? { x: index % 2 === 0 ? 25 : 125, y: 20 + index * 140 }
+      : { x: index % 2 === 0 ? 30 : 275, y: 80 + index * 180 };
+    const isUpdated = path.id === "long-running" && updateApplied;
+    const isSuggested = path.id === "agent-reliability";
+    const sourceCount = path.sources?.length ?? 0;
+    const detail = path.userCreated
+      ? `${sourceCount ? `${sourceCount} source${sourceCount === 1 ? "" : "s"} · ` : ""}${path.concepts.length} concepts`
+      : path.id === "long-running"
+        ? isUpdated ? `Review added · ${path.concepts.length} concepts` : `Current path · ${path.concepts.length} concepts`
+        : isSuggested ? `Added from suggestion · ${path.concepts.length} concepts` : `${path.progress}% mastered · ${path.concepts.length} concepts`;
 
-  if (suggestionAdded) {
-    nodes.push({
-      id: "path-reliability",
+    return {
+      id: `path-${path.id}`,
       type: "learning",
-      position: positions.reliability,
-      ariaLabel: "Agent reliability learning path",
-      data: { title: "Agent reliability", detail: "Added from suggestion · 4 concepts", pathId: "agent-reliability", progress: 0, changed: true, changeLabel: "Added", planned: plannedPathId === "agent-reliability" },
-    });
-  }
-
-  return nodes;
+      position,
+      ariaLabel: `${path.title} learning path`,
+      data: {
+        title: path.title,
+        detail,
+        pathId: path.id,
+        progress: path.progress,
+        current: path.id === "long-running",
+        changed: isUpdated || isSuggested || Boolean(path.userCreated),
+        changeLabel: path.userCreated ? "Created" : isSuggested ? "Added" : isUpdated ? "Updated" : undefined,
+        planned: plannedPathId === path.id,
+      },
+    } satisfies LearningNode;
+  });
 }
 
-function createEdges(suggestionAdded: boolean): Edge[] {
+function createEdges(paths: LearningPath[]): Edge[] {
+  const pathIds = new Set(paths.map((path) => path.id));
   const edges: Edge[] = [
-    { id: "responses-long", source: "path-responses", sourceHandle: "right", target: "path-long-running", targetHandle: "left", label: "foundation", type: "smoothstep", className: "learning-edge" },
-    { id: "long-evals", source: "path-long-running", sourceHandle: "bottom", target: "path-evals", targetHandle: "top", label: "shared state", type: "smoothstep", className: "learning-edge" },
+    { id: "responses-long", source: "path-responses-api", sourceHandle: "right", target: "path-long-running", targetHandle: "left", label: "foundation", type: "smoothstep", className: "learning-edge" },
+    { id: "long-evals", source: "path-long-running", sourceHandle: "bottom", target: "path-agent-evals", targetHandle: "top", label: "shared state", type: "smoothstep", className: "learning-edge" },
   ];
 
-  if (suggestionAdded) edges.push({ id: "long-reliability", source: "path-long-running", sourceHandle: "bottom", target: "path-reliability", targetHandle: "top", label: "recommended", type: "smoothstep", className: "learning-edge suggested" });
+  if (pathIds.has("agent-reliability")) edges.push({ id: "long-reliability", source: "path-long-running", sourceHandle: "bottom", target: "path-agent-reliability", targetHandle: "top", label: "recommended", type: "smoothstep", className: "learning-edge suggested" });
+  for (const path of paths.filter((candidate) => candidate.userCreated && candidate.relatedPathId && pathIds.has(candidate.relatedPathId))) {
+    edges.push({ id: `related-${path.id}`, source: `path-${path.relatedPathId}`, sourceHandle: "bottom", target: `path-${path.id}`, targetHandle: "top", label: "related", type: "smoothstep", className: "learning-edge suggested" });
+  }
   return edges;
+}
+
+function isStoredLearningPath(value: unknown): value is LearningPath {
+  if (!value || typeof value !== "object") return false;
+  const path = value as Partial<LearningPath>;
+  if (!path.userCreated || typeof path.id !== "string" || !path.id.startsWith("custom-") || typeof path.title !== "string" || typeof path.description !== "string") return false;
+  if (typeof path.progress !== "number" || typeof path.next !== "string" || typeof path.status !== "string" || !Array.isArray(path.concepts) || path.concepts.length < 1) return false;
+  if (!path.concepts.every((concept) => concept && typeof concept.title === "string" && typeof concept.objective === "string")) return false;
+  if (path.sources && (!Array.isArray(path.sources) || !path.sources.every((source) => {
+    if (!source || typeof source.id !== "string" || typeof source.title !== "string" || (source.kind !== "file" && source.kind !== "link")) return false;
+    if (!source.href) return true;
+    try { return new URL(source.href).protocol === "https:"; } catch { return false; }
+  }))) return false;
+  return true;
 }

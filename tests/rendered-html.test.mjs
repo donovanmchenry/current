@@ -102,6 +102,9 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /setSuggestionStatus\("added"\)/);
   assert.match(map, /Set as next/);
   assert.match(map, /Remove from queue/);
+  assert.match(map, /New path/);
+  assert.match(map, /customPaths/);
+  assert.match(map, /<CreatePathDialog/);
   assert.match(map, /current-learning-map-v1/);
   assert.match(map, /window\.localStorage\.setItem\(mapStorageKey/);
   assert.match(map, /mapBodyRef\.current\?\.scrollTo\(\{ top: 0 \}\)/);
@@ -109,6 +112,51 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(styles, /\.learning-map-body[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 316px/s);
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.learning-map-body[^}]*display:\s*block[^}]*overflow-y:\s*auto/s);
+});
+
+test("generates a source-derived learning path without an API key", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-path-api`);
+  const { default: worker } = await import(workerUrl.href);
+  const form = new FormData();
+  form.set("subject", "Urban water systems");
+  form.set("goal", "Map the technical decisions involved in planning resilient city infrastructure.");
+  form.append("files", new File([
+    "# Pressure zones\nBalance elevation and delivery pressure across a distribution network.\n\n# Demand forecasting\nEstimate peak and seasonal water use.\n\n# Storage and redundancy\n",
+  ], "water-notes.md", { type: "text/markdown" }));
+
+  const response = await worker.fetch(
+    new Request("http://localhost/api/paths/generate", { method: "POST", body: form }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  assert.equal(response.status, 200);
+  const path = await response.json();
+  assert.equal(path.mode, "demo");
+  assert.equal(path.title, "Urban water systems");
+  assert.ok(path.concepts.length >= 5);
+  assert.ok(path.concepts.some((concept) => /Pressure zones/i.test(concept.title)));
+  assert.ok(path.concepts.every((concept) => concept.objective.length > 10));
+});
+
+test("rejects private learning-path source URLs", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-private-path-source`);
+  const { default: worker } = await import(workerUrl.href);
+  const form = new FormData();
+  form.set("subject", "Network architecture");
+  form.set("goal", "Understand how service boundaries affect reliability and deployment decisions.");
+  form.append("links", "https://127.0.0.1/internal-notes");
+
+  const response = await worker.fetch(
+    new Request("http://localhost/api/paths/generate", { method: "POST", body: form }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /public HTTPS source/i);
 });
 
 test("returns a deterministic evaluation when no API key is configured", async () => {

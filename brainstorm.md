@@ -983,3 +983,11 @@ The three-minute demo should prove one claim: Current does not merely answer que
 The learning map should expose decisions, not simulate background intelligence. The graph is therefore limited to learning paths the user can select, continue, or queue; concept-level nodes should only return when they have a distinct concept workflow.
 
 Agent work appears as inspectable outputs with sources and explicit choices. Accepted updates schedule real review work, path suggestions can be added or dismissed, and those decisions persist across navigation and refresh. Indefinite spinners, decorative agent counts, and status text that cannot be verified do not belong in the MVP.
+
+## User-Created Learning Paths
+
+Creating a path is a primary workflow, not an agent suggestion disguised as one. The user starts from a structured surface in the Learning Map, names the subject, describes the outcome they want, and adds up to four public links and four PDF or text-based files. Current generates a five-to-seven concept sequence with an objective for each concept, then requires the learner to review that outline before adding it.
+
+Created paths persist locally with their concept objectives and source references. They appear in Map and List views, can be inspected, queued next, and removed with confirmation. GPT-5.6 Sol performs the source-grounded generation when an API key is configured; the no-key demo path derives its outline from action phrases, source headings, file headings, and conservative domain prerequisites.
+
+Known next boundary: path creation is now real, but entering a user-created concept still needs a dynamic Read, Recall, Apply, Reflect lesson generated from that path's sources. Uploaded file contents are used during generation but the original binary is not yet stored for later reopening.
