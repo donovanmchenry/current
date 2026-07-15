@@ -108,6 +108,10 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /setQueue\(\(current\) => current\.includes\(pathId\)/);
   assert.match(map, /<ReactFlow[\s\S]*nodes=\{nodes\}[\s\S]*edges=\{edges\}/);
   assert.match(map, /role="tablist" aria-label="Learning map view"/);
+  assert.match(map, /type MapMode = "map" \| "list" \| "updates"/);
+  assert.match(map, /aria-selected=\{mapMode === "updates"\}[\s\S]*Updates/);
+  assert.match(map, /className="agent-updates-view"/);
+  assert.match(map, /openUpdatedPath\("long-running", 1\)/);
   assert.match(map, /setProposalStatus\("applied"\)/);
   assert.match(map, /onApplyResearchUpdate\(\)/);
   assert.match(map, /setSuggestionStatus\("added"\)/);
@@ -122,6 +126,9 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /onOpenLesson\(selectedPath\.id, inspectedConceptIndex\)/);
   assert.match(map, /inspectedConceptState === "current" && selectedPathIsActive \? "Continue" : "Start"/);
   assert.match(map, /className="review-queue"[\s\S]*onStartReview\(review\)/);
+  const researchRail = map.match(/<aside className="research-rail">[\s\S]*?<\/aside>/)?.[0] ?? "";
+  assert.match(researchRail, /Review queue/);
+  assert.doesNotMatch(researchRail, /Agent updates|agent-update-row|research-activity/);
   assert.match(runtime, /export const defaultReviews/);
   assert.match(runtime, /export function nextIncompleteConcept/);
   assert.match(runtime, /export function pathWithProgress/);
@@ -129,6 +136,8 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(styles, /\.current-app\.map-view \.course-sidebar[^}]*display:\s*none/s);
   assert.match(styles, /\.concept-row[^}]*cursor:\s*pointer/s);
   assert.match(styles, /\.learning-map-body[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 316px/s);
+  assert.match(styles, /\.map-view-switcher[^}]*grid-template-columns:\s*repeat\(3,/s);
+  assert.match(styles, /\.agent-updates-view[^}]*width:\s*min\(760px,/s);
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
   assert.match(styles, /\.review-queue-item[^}]*cursor:\s*pointer/s);
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.learning-map-body[^}]*display:\s*block[^}]*overflow-y:\s*auto/s);

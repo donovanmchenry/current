@@ -41,7 +41,7 @@ import type { LearningPath } from "@/lib/learning-path";
 import { isDue, progressForPath, type PathProgress, type ReviewItem } from "@/lib/learning-runtime";
 import { CreatePathDialog } from "./create-path-dialog";
 
-type MapMode = "map" | "list";
+type MapMode = "map" | "list" | "updates";
 type ProposalStatus = "ready" | "applied" | "dismissed";
 type SuggestionStatus = "ready" | "added" | "dismissed";
 
@@ -174,6 +174,7 @@ export function LearningMap({
     setSuggestionStatus("added");
     setSelectedPathId(suggestedPath.id);
     setSelectedConceptIndex(0);
+    setMapMode("map");
   };
 
   const dismissSuggestion = () => {
@@ -187,6 +188,13 @@ export function LearningMap({
     setSelectedPathId("long-running");
     setSelectedConceptIndex(1);
     onApplyResearchUpdate();
+    setMapMode("map");
+  };
+
+  const openUpdatedPath = (pathId: string, conceptIndex: number) => {
+    setSelectedPathId(pathId);
+    setSelectedConceptIndex(conceptIndex);
+    setMapMode("map");
   };
 
   const addCustomPath = (path: LearningPath) => {
@@ -219,6 +227,7 @@ export function LearningMap({
         <div className="map-view-switcher" role="tablist" aria-label="Learning map view">
           <button role="tab" aria-selected={mapMode === "map"} className={mapMode === "map" ? "active" : ""} onClick={() => setMapMode("map")}><Network size={14} /> Map</button>
           <button role="tab" aria-selected={mapMode === "list"} className={mapMode === "list" ? "active" : ""} onClick={() => setMapMode("list")}><List size={14} /> List</button>
+          <button role="tab" aria-selected={mapMode === "updates"} className={mapMode === "updates" ? "active" : ""} onClick={() => setMapMode("updates")}><Activity size={14} /> Updates{pendingUpdates ? <span className="updates-tab-count">{pendingUpdates}</span> : null}</button>
         </div>
         <div className="map-toolbar-actions">
           <button className="create-path-button" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={14} /><span>New path</span></button>
@@ -226,7 +235,50 @@ export function LearningMap({
         </div>
       </div>
 
-      <div className="learning-map-body" ref={mapBodyRef}>
+      <div className={`learning-map-body ${mapMode === "updates" ? "updates-mode" : ""}`} ref={mapBodyRef}>
+        {mapMode === "updates" ? (
+          <section className="agent-updates-view" aria-label="Agent updates">
+            <header className="agent-updates-header">
+              <div><h1>Agent updates</h1><p>Source changes and path suggestions awaiting your decision.</p></div>
+              <span>{pendingUpdates ? `${pendingUpdates} pending` : "Up to date"}</span>
+            </header>
+
+            <div className="agent-updates-feed">
+              <article className={`agent-update-row ${proposalStatus}`}>
+                <span className="agent-update-row-icon">{proposalStatus === "applied" ? <Check size={17} /> : proposalStatus === "dismissed" ? <X size={17} /> : <FileDiff size={17} />}</span>
+                <div className="agent-update-row-content">
+                  <small>Source change</small>
+                  <h2>{proposalStatus === "applied" ? "Compaction path updated" : proposalStatus === "dismissed" ? "Update dismissed" : "Compaction source changed"}</h2>
+                  <p>{proposalStatus === "applied" ? "A targeted recall review was added to the Compaction concept." : proposalStatus === "dismissed" ? "The existing path was left unchanged." : "The official guide now makes one detail more precise."}</p>
+                  {proposalStatus === "ready" && !reviewOpen ? <button className="activity-action" onClick={() => setReviewOpen(true)}>Review update <ArrowRight size={12} /></button> : null}
+                  {proposalStatus === "applied" ? <button className="activity-action" onClick={() => openUpdatedPath("long-running", 1)}>View Compaction <ArrowRight size={12} /></button> : null}
+                  {proposalStatus === "dismissed" ? <button className="activity-action" onClick={() => setProposalStatus("ready")}><RotateCcw size={12} /> Restore</button> : null}
+                  {reviewOpen && proposalStatus === "ready" ? (
+                    <div className="proposal-review agent-update-review">
+                      <span>Proposed clarification</span>
+                      <p>The compact item carries opaque model context, not a summary intended for people to read or edit.</p>
+                      <a href="https://developers.openai.com/api/docs/guides/compaction" target="_blank" rel="noreferrer">Official source <ExternalLink size={11} /></a>
+                      <div><button onClick={applyProposal}><Check size={12} /> Apply update</button><button onClick={() => { setProposalStatus("dismissed"); setReviewOpen(false); }}>Dismiss</button></div>
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+
+              <article className={`agent-update-row ${effectiveSuggestionStatus}`}>
+                <span className="agent-update-row-icon">{effectiveSuggestionStatus === "added" ? <Check size={17} /> : effectiveSuggestionStatus === "dismissed" ? <X size={17} /> : <Sparkles size={17} />}</span>
+                <div className="agent-update-row-content">
+                  <small>Path suggestion</small>
+                  <h2>{effectiveSuggestionStatus === "added" ? "Agent reliability added" : effectiveSuggestionStatus === "dismissed" ? "Suggestion dismissed" : "Agent reliability"}</h2>
+                  <p>{effectiveSuggestionStatus === "added" ? "The path is connected to recovery patterns and agent evaluations." : effectiveSuggestionStatus === "dismissed" ? "The path can be restored later." : "Four concepts connect tool failures, retries, handoffs, and reliability budgets."}</p>
+                  {effectiveSuggestionStatus === "ready" ? <div className="suggestion-actions"><button onClick={addSuggestedPath}><CirclePlus size={12} /> Add path</button><button onClick={dismissSuggestion}>Dismiss</button></div> : null}
+                  {effectiveSuggestionStatus === "added" ? <button className="activity-action" onClick={() => openUpdatedPath(suggestedPath.id, 0)}>View path <ArrowRight size={12} /></button> : null}
+                  {effectiveSuggestionStatus === "dismissed" ? <button className="activity-action" onClick={() => setSuggestionStatus("ready")}><RotateCcw size={12} /> Restore</button> : null}
+                </div>
+              </article>
+            </div>
+          </section>
+        ) : (
+          <>
         <div className="map-primary">
           {mapMode === "map" ? (
             <div className="graph-canvas">
@@ -339,38 +391,9 @@ export function LearningMap({
             }) : <p className="review-queue-empty">Nothing due. Completed concepts will return here.</p>}
           </section>
 
-          <section className="research-activity">
-            <div className="research-heading"><div><Activity size={15} /><span>Agent updates</span></div><small>{pendingUpdates ? `${pendingUpdates} pending` : "Up to date"}</small></div>
-
-            <article className={`agent-activity-item ${proposalStatus}`}>
-              <span className="activity-icon">{proposalStatus === "applied" ? <Check size={15} /> : proposalStatus === "dismissed" ? <X size={15} /> : <FileDiff size={15} />}</span>
-              <div className="activity-content">
-                <strong>{proposalStatus === "applied" ? "Compaction path updated" : proposalStatus === "dismissed" ? "Update dismissed" : "Compaction source changed"}</strong>
-                <p>{proposalStatus === "applied" ? "A targeted recall review was added." : proposalStatus === "dismissed" ? "The existing path was left unchanged." : "One explanation can be made more precise."}</p>
-                {proposalStatus === "ready" && !reviewOpen ? <button className="activity-action" onClick={() => setReviewOpen(true)}>Review update <ArrowRight size={12} /></button> : null}
-                {proposalStatus === "dismissed" ? <button className="activity-action" onClick={() => setProposalStatus("ready")}><RotateCcw size={12} /> Restore</button> : null}
-                {reviewOpen && proposalStatus === "ready" ? (
-                  <div className="proposal-review">
-                    <span>Proposed clarification</span>
-                    <p>The compact item carries opaque model context, not a summary intended for people to read or edit.</p>
-                    <a href="https://developers.openai.com/api/docs/guides/compaction" target="_blank" rel="noreferrer">Official source <ExternalLink size={11} /></a>
-                    <div><button onClick={applyProposal}><Check size={12} /> Apply update</button><button onClick={() => { setProposalStatus("dismissed"); setReviewOpen(false); }}>Dismiss</button></div>
-                  </div>
-                ) : null}
-              </div>
-            </article>
-
-            <article className={`agent-activity-item ${effectiveSuggestionStatus}`}>
-              <span className="activity-icon">{effectiveSuggestionStatus === "added" ? <Check size={15} /> : effectiveSuggestionStatus === "dismissed" ? <X size={15} /> : <Sparkles size={15} />}</span>
-              <div className="activity-content">
-                <strong>{effectiveSuggestionStatus === "added" ? "Agent reliability added" : effectiveSuggestionStatus === "dismissed" ? "Suggestion dismissed" : "Suggested learning path"}</strong>
-                <p>{effectiveSuggestionStatus === "added" ? "The new path is connected to recovery and evaluations." : effectiveSuggestionStatus === "dismissed" ? "The path can be restored later." : "Agent reliability shares four concepts with your current paths."}</p>
-                {effectiveSuggestionStatus === "ready" ? <div className="suggestion-actions"><button onClick={addSuggestedPath}><CirclePlus size={12} /> Add path</button><button onClick={dismissSuggestion}>Dismiss</button></div> : null}
-                {effectiveSuggestionStatus === "dismissed" ? <button className="activity-action" onClick={() => setSuggestionStatus("ready")}><RotateCcw size={12} /> Restore</button> : null}
-              </div>
-            </article>
-          </section>
         </aside>
+          </>
+        )}
       </div>
       <CreatePathDialog open={createPathOpen} onClose={() => setCreatePathOpen(false)} onCreate={addCustomPath} />
     </section>
