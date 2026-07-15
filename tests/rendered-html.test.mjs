@@ -118,7 +118,9 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /map-transition-\$\{mapTransitionDirection\}/);
   assert.match(map, /type MapMode = "map" \| "list" \| "updates" \| "notes"/);
   assert.match(map, /aria-selected=\{mapMode === "updates"\}[\s\S]*Updates/);
-  assert.doesNotMatch(map, /updates-tab-dot|<Activity size=\{14\} \/> Updates/);
+  assert.doesNotMatch(map, /updates-tab-dot/);
+  assert.match(map, /pendingUpdates \? "updates-pending" : ""/);
+  assert.match(map, /<Activity size=\{14\} aria-hidden="true" \/> Updates/);
   assert.match(map, /className="agent-updates-view map-view-enter"/);
   assert.match(map, /className="notes-index-view map-view-enter"/);
   assert.match(map, /graph-canvas map-surface/);
@@ -157,6 +159,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(styles, /\.research-rail[^}]*grid-column:\s*2[^}]*grid-row:\s*1 \/ span 2/s);
   assert.match(styles, /\.map-view-switcher[^}]*grid-template-columns:\s*repeat\(4,/s);
   assert.match(styles, /\.map-view-switcher::before[^}]*transition:\s*transform \.36s cubic-bezier\(\.22, 1, \.36, 1\)/s);
+  assert.match(styles, /\.map-view-switcher button\.updates-pending > svg[^}]*color:\s*var\(--accent-bright\)/s);
   assert.match(styles, /\.map-surface\.active[^}]*opacity:\s*1[^}]*visibility:\s*visible/s);
   assert.match(styles, /\.map-full-view\.active[^}]*opacity:\s*1[^}]*visibility:\s*visible/s);
   assert.match(styles, /\.map-full-view[^}]*z-index:\s*10/s);
