@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Activity,
   ArrowRight,
   BookOpen,
   CalendarClock,
@@ -234,7 +233,7 @@ export function LearningMap({
   };
 
   return (
-    <section className={`learning-map-shell ${fullViewActive ? "updates-view" : ""}`} aria-label="Learning map">
+    <section className="learning-map-shell" aria-label="Learning map">
       <div className="map-toolbar">
         <div className="map-toolbar-start">
           <span className="map-wordmark">
@@ -248,7 +247,7 @@ export function LearningMap({
         <div className={`map-view-switcher mode-${mapMode}`} role="tablist" aria-label="Learning map view">
           <button role="tab" aria-selected={mapMode === "map"} className={mapMode === "map" ? "active" : ""} onClick={() => switchMapMode("map")}><Network size={14} /> Map</button>
           <button role="tab" aria-selected={mapMode === "list"} className={mapMode === "list" ? "active" : ""} onClick={() => switchMapMode("list")}><List size={14} /> List</button>
-          <button role="tab" aria-label={pendingUpdates ? `Updates, ${pendingUpdates} pending` : "Updates"} aria-selected={mapMode === "updates"} className={mapMode === "updates" ? "active" : ""} onClick={() => switchMapMode("updates")}><Activity size={14} /> Updates{pendingUpdates ? <span className="updates-tab-dot" aria-hidden="true" /> : null}</button>
+          <button role="tab" aria-label={pendingUpdates ? `Updates, ${pendingUpdates} pending` : "Updates"} aria-selected={mapMode === "updates"} className={mapMode === "updates" ? "active" : ""} onClick={() => switchMapMode("updates")}>Updates</button>
           <button role="tab" aria-selected={mapMode === "notes"} className={mapMode === "notes" ? "active" : ""} onClick={() => switchMapMode("notes")}><NotebookPen size={14} /> Notes{noteEntries.length ? <span className="updates-tab-count">{noteEntries.length}</span> : null}</button>
         </div>
         <div className="map-toolbar-actions">

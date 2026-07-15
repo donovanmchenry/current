@@ -118,7 +118,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /map-transition-\$\{mapTransitionDirection\}/);
   assert.match(map, /type MapMode = "map" \| "list" \| "updates" \| "notes"/);
   assert.match(map, /aria-selected=\{mapMode === "updates"\}[\s\S]*Updates/);
-  assert.match(map, /className="updates-tab-dot"/);
+  assert.doesNotMatch(map, /updates-tab-dot|<Activity size=\{14\} \/> Updates/);
   assert.match(map, /className="agent-updates-view map-view-enter"/);
   assert.match(map, /className="notes-index-view map-view-enter"/);
   assert.match(map, /graph-canvas map-surface/);
@@ -152,12 +152,17 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(styles, /\.current-app\.map-view \.course-sidebar[^}]*display:\s*none/s);
   assert.match(styles, /\.concept-row[^}]*cursor:\s*pointer/s);
   assert.match(styles, /\.learning-map-shell[^}]*grid-template-columns:\s*minmax\(0, 1fr\) var\(--map-rail\)/s);
+  assert.doesNotMatch(styles, /\.learning-map-shell\.updates-view|grid-template-columns \.36s/);
   assert.match(styles, /\.map-toolbar[^}]*grid-column:\s*1[^}]*grid-row:\s*1/s);
   assert.match(styles, /\.research-rail[^}]*grid-column:\s*2[^}]*grid-row:\s*1 \/ span 2/s);
   assert.match(styles, /\.map-view-switcher[^}]*grid-template-columns:\s*repeat\(4,/s);
   assert.match(styles, /\.map-view-switcher::before[^}]*transition:\s*transform \.36s cubic-bezier\(\.22, 1, \.36, 1\)/s);
   assert.match(styles, /\.map-surface\.active[^}]*opacity:\s*1[^}]*visibility:\s*visible/s);
   assert.match(styles, /\.map-full-view\.active[^}]*opacity:\s*1[^}]*visibility:\s*visible/s);
+  assert.match(styles, /\.map-full-view[^}]*z-index:\s*10/s);
+  assert.match(styles, /\.map-rail-enter[^}]*animation:\s*map-rail-in \.32s cubic-bezier\(\.22, 1, \.36, 1\);/s);
+  assert.doesNotMatch(styles, /\.map-rail-enter[^}]*animation:[^;}]*both/s);
+  assert.match(styles, /\.research-rail\.workspace-hidden[^}]*translate3d\(16px, 0, 0\)[^}]*visibility 0s linear \.32s/s);
   assert.match(styles, /@keyframes map-view-forward-in/);
   assert.match(styles, /\.agent-updates-view[^}]*width:\s*min\(760px,/s);
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
