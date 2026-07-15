@@ -54,8 +54,8 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.match(styles, /\.lesson-toolbar[^}]*background:\s*hsl\(var\(--background\) \/ \.58\)[^}]*backdrop-filter:\s*blur\(18px\) saturate\(140%\)/s);
   assert.match(styles, /\.lesson-scroll[^}]*inset:\s*0[^}]*padding-top:\s*54px/s);
   assert.match(styles, /\.lesson-toolbar[^}]*border-bottom:\s*0/s);
-  assert.match(styles, /\.module-header[^}]*border-bottom:\s*0/s);
-  assert.match(styles, /\.reading-section[^}]*border-bottom:\s*0/s);
+  assert.match(styles, /\.module-header[^}]*margin-bottom:\s*32px[^}]*padding-bottom:\s*0[^}]*border-bottom:\s*0/s);
+  assert.match(styles, /\.reading-section[^}]*padding:\s*0[^}]*border-bottom:\s*0/s);
   assert.match(styles, /\.sidebar-source-item[^}]*border-top:\s*0/s);
   assert.match(styles, /\.notes-pane textarea[^}]*border-top:\s*0/s);
   assert.match(styles, /\.session-summary[^}]*gap:\s*6px[^}]*background:\s*transparent/s);
@@ -64,6 +64,11 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
   assert.match(styles, /\.sidebar-brand[^}]*color:\s*var\(--text\)[^}]*font-family:\s*"OpenAI Sans"[^}]*font-size:\s*20px[^}]*font-weight:\s*600/s);
   assert.match(styles, /\.sidebar-wordmark[^}]*gap:\s*8px/s);
   assert.match(styles, /\.sidebar-wordmark img[^}]*width:\s*20px[^}]*height:\s*20px/s);
+  assert.match(styles, /\.reading-section h2[^}]*font-size:\s*17px/s);
+  assert.match(styles, /\.reading-section > p[^}]*font-size:\s*14px[^}]*line-height:\s*1\.7/s);
+  assert.match(styles, /\.source-excerpt \+ \.reading-section[^}]*margin-top:\s*32px/s);
+  assert.match(styles, /\.recall-input[^}]*margin-top:\s*0/s);
+  assert.match(styles, /\.sidebar-source-item small[^}]*font-size:\s*11px/s);
   assert.match(styles, /\.diagram-stage[^}]*border-radius:\s*8px/s);
   assert.match(styles, /\.diagram-stage strong[^}]*border-radius:\s*6px/s);
   assert.match(styles, /\.diagram-stage\.result[^}]*background:\s*#0d0d0d[^}]*box-shadow:\s*inset 0 0 0 1px hsl\(var\(--primary\) \/ \.38\)/s);
