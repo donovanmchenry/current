@@ -3,6 +3,9 @@ export type LearningConcept = {
   objective: string;
   summary?: string;
   checkpoints?: string[];
+  sourceIds?: string[];
+  sourceNote?: string;
+  updatedAt?: string;
 };
 
 export type LearningSource = {

@@ -3,13 +3,16 @@ import { NextResponse } from "next/server";
 import type { GeneratedLearningPath, LearningConcept } from "@/lib/learning-path";
 
 const allowedTextExtensions = new Set(["csv", "json", "md", "txt"]);
-const blockedHeadings = new Set(["about", "contact", "contents", "data", "definition", "documentation", "external links", "home", "introduction", "menu", "methodology", "overview", "privacy", "references", "search", "see also", "settings"]);
+const blockedHeadings = new Set([
+  "about", "api reference", "contact", "contents", "core concepts", "data", "definition", "documentation", "examples", "external links", "get started", "guides", "home", "introduction", "menu", "methodology", "on this page", "overview", "privacy", "references", "resources", "search", "see also", "settings", "suggested",
+]);
 const stopWords = new Set([
   "about", "after", "again", "against", "also", "because", "before", "being", "between", "could", "from", "have", "into", "more", "most", "other", "over", "should", "some", "such", "than", "that", "their", "there", "these", "they", "this", "through", "under", "using", "very", "want", "what", "when", "where", "which", "while", "with", "would", "your",
 ]);
 const instructionWords = new Set(["basic", "build", "clearly", "design", "enough", "evaluate", "learn", "simple", "small", "understand", "well"]);
 
 type FetchedSource = {
+  id: string;
   url: string;
   title: string;
   text: string;
@@ -17,6 +20,7 @@ type FetchedSource = {
 };
 
 type TextFileSource = {
+  id: string;
   name: string;
   text: string;
   headings: string[];
@@ -59,8 +63,13 @@ function cleanHeading(value: string) {
   return cleanText(value.replace(/^#{1,6}\s*/, "")).replace(/[|•·]+/g, " ").trim().slice(0, 72);
 }
 
+function htmlContentRegion(html: string) {
+  const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ?? html;
+  return main.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)?.[1] ?? main;
+}
+
 function extractHtmlHeadings(html: string) {
-  return Array.from(html.matchAll(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/gi))
+  return Array.from(htmlContentRegion(html).matchAll(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/gi))
     .map((match) => cleanHeading(match[1]))
     .filter(isUsefulHeading)
     .slice(0, 12);
@@ -77,7 +86,9 @@ function extractTextHeadings(text: string) {
 
 function isUsefulHeading(value: string) {
   const normalized = value.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-  return normalized.length >= 4 && !blockedHeadings.has(normalized) && !/^chapter \d+$/.test(normalized);
+  const looksLikeNavigation = /^(?:browse|explore|search)\b.*(?:api|docs?|documentation)?$/.test(normalized)
+    || /^(?:learn|read|view) more$/.test(normalized);
+  return normalized.length >= 4 && !blockedHeadings.has(normalized) && !looksLikeNavigation && !/^chapter \d+$/.test(normalized);
 }
 
 function isSafeSourceUrl(value: string) {
@@ -95,7 +106,7 @@ function isSafeSourceUrl(value: string) {
   }
 }
 
-async function fetchSource(url: string): Promise<FetchedSource | null> {
+async function fetchSource(url: string, id: string): Promise<FetchedSource | null> {
   if (!isSafeSourceUrl(url)) return null;
   try {
     let currentUrl = url;
@@ -119,12 +130,14 @@ async function fetchSource(url: string): Promise<FetchedSource | null> {
     if (!contentType.includes("text/") && !contentType.includes("json") && !contentType.includes("xml")) return null;
     const contentLength = Number(response.headers.get("content-length") ?? 0);
     if (contentLength > 2_000_000) return null;
-    const raw = (await response.text()).slice(0, 120_000);
+    const raw = (await response.text()).slice(0, 1_000_000);
+    const sourceBody = contentType.includes("html") ? htmlContentRegion(raw) : raw;
     const htmlTitle = raw.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1];
     return {
+      id,
       url,
       title: cleanHeading(htmlTitle ?? new URL(currentUrl).hostname),
-      text: cleanText(raw).slice(0, 60_000),
+      text: cleanText(sourceBody).slice(0, 60_000),
       headings: contentType.includes("html") ? extractHtmlHeadings(raw) : extractTextHeadings(raw),
     };
   } catch {
@@ -140,10 +153,18 @@ function isTextFile(file: File) {
   return file.type.startsWith("text/") || allowedTextExtensions.has(extensionFor(file));
 }
 
-async function readTextFile(file: File): Promise<TextFileSource | null> {
+async function readTextFile(file: File, id: string): Promise<TextFileSource | null> {
   if (!isTextFile(file)) return null;
   const text = (await file.text()).slice(0, 60_000);
-  return { name: file.name, text, headings: extractTextHeadings(text) };
+  return { id, name: file.name, text, headings: extractTextHeadings(text) };
+}
+
+function linkSourceId(link: string, index: number) {
+  return `link-${index}-${link}`;
+}
+
+function fileSourceId(file: File, index: number) {
+  return `file-${index}-${file.name}`;
 }
 
 async function fileDataUrl(file: File) {
@@ -227,7 +248,7 @@ function conceptContent(title: string, subject: string, goal: string, final: boo
     checkpoints: ["Frame the decision", "Compare alternatives", "Test what would change the choice"],
   };
   if (/foundation/.test(normalized)) return {
-    objective: `Identify the core objects, assumptions, and questions that define a ${subject} problem.`,
+    objective: `Identify the core objects, assumptions, and questions that define ${/^[aeiou]/i.test(subject) ? "an" : "a"} ${subject} problem.`,
     summary: `A useful foundation separates the decision itself from the evidence, constraints, and outcomes around it.`,
     checkpoints: ["Core vocabulary", "Assumptions and boundaries", "A representative problem"],
   };
@@ -264,10 +285,23 @@ function conceptContent(title: string, subject: string, goal: string, final: boo
 
   const conciseGoal = cleanText(goal).replace(/^(?:understand|learn)\s+/i, "").replace(/[.]$/, "");
   return {
-    objective: `Explain ${title.toLowerCase()} and use it to ${conciseGoal}.`,
+    objective: `Explain ${title.toLowerCase()} and show how it changes a concrete decision about ${conciseGoal}.`,
     summary: `${title} is one working piece of ${subject}; learn what it changes, where it applies, and how it can fail.`,
     checkpoints: ["Definition and boundaries", "Effect on a real decision", "A common failure or limitation"],
   };
+}
+
+function sourceEvidence(title: string, sources: Array<{ id: string; text: string }>, index: number) {
+  if (!sources.length) return {};
+  const terms = title.toLowerCase().match(/[a-z][a-z0-9-]{3,}/g) ?? [];
+  const ranked = sources.map((source) => {
+    const sentences = source.text.split(/(?<=[.!?])\s+/).filter((sentence) => sentence.length >= 45 && sentence.length <= 420);
+    const matching = sentences.find((sentence) => terms.some((term) => sentence.toLowerCase().includes(term)));
+    return { source, note: matching ?? sentences[0] ?? source.text.slice(0, 320) };
+  });
+  const selected = ranked[index % ranked.length];
+  const sourceNote = cleanText(selected.note).slice(0, 360);
+  return sourceNote ? { sourceIds: [selected.source.id], sourceNote } : { sourceIds: [selected.source.id] };
 }
 
 function buildConcepts(subject: string, goal: string, fetched: FetchedSource[], textFiles: TextFileSource[], files: File[]): LearningConcept[] {
@@ -300,7 +334,15 @@ function buildConcepts(subject: string, goal: string, fetched: FetchedSource[], 
   const practiceTitle = `${subjectTitle} in practice`;
   if (!titles.some((title) => title.toLowerCase() === practiceTitle.toLowerCase())) titles.push(practiceTitle);
 
-  return titles.map((title, index) => ({ title, ...conceptContent(title, subjectTitle, goal, index === titles.length - 1) }));
+  const evidenceSources = [
+    ...fetched.map((source) => ({ id: source.id, text: source.text })),
+    ...textFiles.map((source) => ({ id: source.id, text: source.text })),
+  ];
+  return titles.map((title, index) => ({
+    title,
+    ...conceptContent(title, subjectTitle, goal, index === titles.length - 1),
+    ...sourceEvidence(title, evidenceSources, index),
+  }));
 }
 
 function demoPath(subject: string, goal: string, fetched: FetchedSource[], textFiles: TextFileSource[], files: File[]): GeneratedLearningPath {
@@ -336,6 +378,8 @@ function validateGeneratedPath(value: unknown): Omit<GeneratedLearningPath, "mod
       objective: cleanText(concept.objective).slice(0, 240),
       summary: typeof concept.summary === "string" ? cleanText(concept.summary).slice(0, 360) : undefined,
       checkpoints: Array.isArray(concept.checkpoints) ? concept.checkpoints.filter((item): item is string => typeof item === "string").map((item) => cleanText(item).slice(0, 120)).slice(0, 5) : undefined,
+      sourceIds: Array.isArray(concept.sourceIds) ? concept.sourceIds.filter((item): item is string => typeof item === "string").slice(0, 4) : undefined,
+      sourceNote: typeof concept.sourceNote === "string" ? cleanText(concept.sourceNote).slice(0, 360) : undefined,
     })),
     relatedPathId: allowedRelatedPaths.has(path.relatedPathId ?? null) ? path.relatedPathId ?? null : null,
   };
@@ -359,16 +403,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Attach PDF, Markdown, text, CSV, or JSON files." }, { status: 400 });
   }
 
-  const fetched = (await Promise.all(links.map(fetchSource))).filter((source): source is FetchedSource => Boolean(source));
-  const textFiles = (await Promise.all(files.map(readTextFile))).filter((source): source is TextFileSource => Boolean(source));
+  const fetched = (await Promise.all(links.map((link, index) => fetchSource(link, linkSourceId(link, index))))).filter((source): source is FetchedSource => Boolean(source));
+  const textFiles = (await Promise.all(files.map((file, index) => readTextFile(file, fileSourceId(file, index))))).filter((source): source is TextFileSource => Boolean(source));
   const fallback = demoPath(subject, goal, fetched, textFiles, files);
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return NextResponse.json(fallback);
 
   try {
     const sourceSections = [
-      ...fetched.map((source) => `Source link: ${source.title}\nURL: ${source.url}\n${source.text.slice(0, 16_000)}`),
-      ...textFiles.map((source) => `Source file: ${source.name}\n${source.text.slice(0, 16_000)}`),
+      ...fetched.map((source) => `Source ID: ${source.id}\nSource link: ${source.title}\nURL: ${source.url}\n${source.text.slice(0, 16_000)}`),
+      ...textFiles.map((source) => `Source ID: ${source.id}\nSource file: ${source.name}\n${source.text.slice(0, 16_000)}`),
     ];
     const content: Array<Record<string, string>> = [
       {
@@ -377,7 +421,9 @@ export async function POST(request: Request) {
       },
     ];
 
-    for (const file of files.filter((entry) => entry.type === "application/pdf")) {
+    for (const [index, file] of files.entries()) {
+      if (file.type !== "application/pdf") continue;
+      content.push({ type: "input_text", text: `The following PDF has Source ID: ${fileSourceId(file, index)}` });
       content.push({ type: "input_file", filename: file.name, file_data: await fileDataUrl(file) });
     }
 
@@ -392,7 +438,7 @@ export async function POST(request: Request) {
         input: [
           {
             role: "system",
-            content: "You design source-grounded learning paths for Current. Produce 5 to 7 progressive, specific concepts that move from prerequisite mental models to application. Every concept needs a concrete learning objective, a two-sentence-or-shorter explanation, and 2 to 4 checkpoints that can be tested through active recall. Avoid tautologies such as 'understand X' for a concept named X. Use supplied source terminology when relevant, but do not reproduce navigation headings or invent claims. Keep the title literal and concise. relatedPathId may be long-running, responses-api, agent-evals, or null.",
+            content: "You design source-grounded learning paths for Current. Produce 5 to 7 progressive, specific concepts that move from prerequisite mental models to application. Every concept needs a concrete learning objective, a two-sentence-or-shorter explanation, and 2 to 4 checkpoints that can be tested through active recall. When source material is supplied, include the exact relevant source IDs and a concise source-grounded note for each concept. Use an empty sourceIds array and empty sourceNote only when no supplied evidence supports that concept. Avoid tautologies such as 'understand X' for a concept named X. Use supplied source terminology when relevant, but do not reproduce navigation headings or invent claims. Keep the title literal and concise. relatedPathId may be long-running, responses-api, agent-evals, or null.",
           },
           { role: "user", content },
         ],
@@ -419,8 +465,10 @@ export async function POST(request: Request) {
                       objective: { type: "string" },
                       summary: { type: "string" },
                       checkpoints: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } },
+                      sourceIds: { type: "array", maxItems: 4, items: { type: "string" } },
+                      sourceNote: { type: "string" },
                     },
-                    required: ["title", "objective", "summary", "checkpoints"],
+                    required: ["title", "objective", "summary", "checkpoints", "sourceIds", "sourceNote"],
                   },
                 },
                 relatedPathId: { anyOf: [{ type: "string", enum: ["long-running", "responses-api", "agent-evals"] }, { type: "null" }] },

@@ -15,8 +15,10 @@ import {
   Link2,
   List,
   Network,
+  NotebookPen,
   Plus,
   RotateCcw,
+  Search,
   Sparkles,
   Trash2,
   X,
@@ -37,10 +39,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { suggestedPath } from "@/lib/learning-catalog";
 import type { LearningPath } from "@/lib/learning-path";
-import { isDue, progressForPath, type PathProgress, type ReviewItem } from "@/lib/learning-runtime";
+import { isDue, progressForPath, type LearnerProfile, type PathProgress, type ReviewItem } from "@/lib/learning-runtime";
 import { CreatePathDialog } from "./create-path-dialog";
 
-type MapMode = "map" | "list" | "updates";
+type MapMode = "map" | "list" | "updates" | "notes";
 type ProposalStatus = "ready" | "applied" | "dismissed";
 type SuggestionStatus = "ready" | "added" | "dismissed";
 
@@ -66,7 +68,10 @@ type LearningMapProps = {
   queue: string[];
   progress: Record<string, PathProgress>;
   reviews: ReviewItem[];
+  notesByConcept: Record<string, string>;
+  learnerProfile: LearnerProfile;
   suggestedPathAdded: boolean;
+  researchUpdateApplied: boolean;
   onOpenLesson: (pathId: string, conceptIndex: number) => void;
   onQueuePath: (pathId: string) => void;
   onAddCustomPath: (path: LearningPath) => void;
@@ -82,7 +87,10 @@ export function LearningMap({
   queue,
   progress,
   reviews,
+  notesByConcept,
+  learnerProfile,
   suggestedPathAdded,
+  researchUpdateApplied,
   onOpenLesson,
   onQueuePath,
   onAddCustomPath,
@@ -97,20 +105,23 @@ export function LearningMap({
     const path = paths.find((candidate) => candidate.id === activePathId) ?? paths[0];
     return progressForPath(path, progress[path.id]).currentConceptIndex;
   });
-  const [proposalStatus, setProposalStatus] = useState<ProposalStatus>("ready");
+  const [proposalStatus, setProposalStatus] = useState<ProposalStatus>(researchUpdateApplied ? "applied" : "ready");
   const [suggestionStatus, setSuggestionStatus] = useState<SuggestionStatus>(suggestedPathAdded ? "added" : "ready");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [compactGraph, setCompactGraph] = useState(false);
   const [createPathOpen, setCreatePathOpen] = useState(false);
+  const [noteQuery, setNoteQuery] = useState("");
   const [removePathId, setRemovePathId] = useState<string | null>(null);
   const mapBodyRef = useRef<HTMLDivElement>(null);
   const storageHydratedRef = useRef(false);
 
   const selectedPath = paths.find((path) => path.id === selectedPathId) ?? paths.find((path) => path.id === activePathId) ?? paths[0];
   const effectiveSuggestionStatus: SuggestionStatus = suggestedPathAdded ? "added" : suggestionStatus;
+  const effectiveProposalStatus: ProposalStatus = researchUpdateApplied ? "applied" : proposalStatus;
   const selectedProgress = progressForPath(selectedPath, progress[selectedPath.id]);
   const inspectedConceptIndex = Math.max(0, Math.min(selectedConceptIndex, selectedPath.concepts.length - 1));
   const inspectedConcept = selectedPath.concepts[inspectedConceptIndex];
+  const inspectedSources = (selectedPath.sources ?? []).filter((source) => inspectedConcept.sourceIds === undefined || inspectedConcept.sourceIds.includes(source.id));
   const inspectedConceptState = selectedProgress.completedConceptIndexes.includes(inspectedConceptIndex)
     ? "done"
     : inspectedConceptIndex === selectedProgress.currentConceptIndex ? "current" : "upcoming";
@@ -118,10 +129,18 @@ export function LearningMap({
   const inspectedConceptLabel = inspectedConceptState === "done" ? "Completed" : inspectedConceptState === "current" ? (selectedPathIsActive ? "Current" : "Next") : "Upcoming";
   const plannedPath = paths.find((path) => path.id === queue[0]);
   const dueReviews = reviews.filter((review) => isDue(review) && paths.some((path) => path.id === review.pathId));
-  const pendingUpdates = Number(proposalStatus === "ready") + Number(effectiveSuggestionStatus === "ready");
+  const pendingUpdates = Number(effectiveProposalStatus === "ready") + Number(effectiveSuggestionStatus === "ready");
+  const noteEntries = useMemo(() => paths.flatMap((path) => path.concepts.flatMap((concept, conceptIndex) => {
+    const text = notesByConcept[`${path.id}:${conceptIndex}`]?.trim();
+    return text ? [{ path, concept, conceptIndex, text }] : [];
+  })), [notesByConcept, paths]);
+  const filteredNotes = useMemo(() => {
+    const query = noteQuery.trim().toLowerCase();
+    return query ? noteEntries.filter((entry) => `${entry.path.title} ${entry.concept.title} ${entry.text}`.toLowerCase().includes(query)) : noteEntries;
+  }, [noteEntries, noteQuery]);
   const nodes = useMemo(
-    () => createNodes(proposalStatus === "applied", paths, activePathId, queue, compactGraph),
-    [activePathId, compactGraph, paths, proposalStatus, queue],
+    () => createNodes(effectiveProposalStatus === "applied", paths, activePathId, queue, compactGraph),
+    [activePathId, compactGraph, effectiveProposalStatus, paths, queue],
   );
   const edges = useMemo(() => createEdges(paths), [paths]);
 
@@ -210,7 +229,7 @@ export function LearningMap({
   };
 
   return (
-    <section className={`learning-map-shell ${mapMode === "updates" ? "updates-view" : ""}`} aria-label="Learning map">
+    <section className={`learning-map-shell ${mapMode === "updates" || mapMode === "notes" ? "updates-view" : ""}`} aria-label="Learning map">
       <div className="map-toolbar">
         <div className="map-toolbar-start">
           <span className="map-wordmark">
@@ -225,13 +244,14 @@ export function LearningMap({
           <button role="tab" aria-selected={mapMode === "map"} className={mapMode === "map" ? "active" : ""} onClick={() => setMapMode("map")}><Network size={14} /> Map</button>
           <button role="tab" aria-selected={mapMode === "list"} className={mapMode === "list" ? "active" : ""} onClick={() => setMapMode("list")}><List size={14} /> List</button>
           <button role="tab" aria-selected={mapMode === "updates"} className={mapMode === "updates" ? "active" : ""} onClick={() => setMapMode("updates")}><Activity size={14} /> Updates{pendingUpdates ? <span className="updates-tab-count">{pendingUpdates}</span> : null}</button>
+          <button role="tab" aria-selected={mapMode === "notes"} className={mapMode === "notes" ? "active" : ""} onClick={() => setMapMode("notes")}><NotebookPen size={14} /> Notes{noteEntries.length ? <span className="updates-tab-count">{noteEntries.length}</span> : null}</button>
         </div>
         <div className="map-toolbar-actions">
           <button className="create-path-button" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={14} /><span>New path</span></button>
         </div>
       </div>
 
-      <div className={`learning-map-body ${mapMode === "updates" ? "updates-mode" : ""}`} ref={mapBodyRef}>
+      <div className={`learning-map-body ${mapMode === "updates" || mapMode === "notes" ? "updates-mode" : ""}`} ref={mapBodyRef}>
         {mapMode === "updates" ? (
           <section className="agent-updates-view" aria-label="Agent updates">
             <header className="agent-updates-header">
@@ -240,16 +260,16 @@ export function LearningMap({
             </header>
 
             <div className="agent-updates-feed">
-              <article className={`agent-update-row ${proposalStatus}`}>
-                <span className="agent-update-row-icon">{proposalStatus === "applied" ? <Check size={17} /> : proposalStatus === "dismissed" ? <X size={17} /> : <FileDiff size={17} />}</span>
+              <article className={`agent-update-row ${effectiveProposalStatus}`}>
+                <span className="agent-update-row-icon">{effectiveProposalStatus === "applied" ? <Check size={17} /> : effectiveProposalStatus === "dismissed" ? <X size={17} /> : <FileDiff size={17} />}</span>
                 <div className="agent-update-row-content">
                   <small>Source change</small>
-                  <h2>{proposalStatus === "applied" ? "Compaction path updated" : proposalStatus === "dismissed" ? "Update dismissed" : "Compaction source changed"}</h2>
-                  <p>{proposalStatus === "applied" ? "A targeted recall review was added to the Compaction concept." : proposalStatus === "dismissed" ? "The existing path was left unchanged." : "The official guide now makes one detail more precise."}</p>
-                  {proposalStatus === "ready" && !reviewOpen ? <button className="activity-action" onClick={() => setReviewOpen(true)}>Review update <ArrowRight size={12} /></button> : null}
-                  {proposalStatus === "applied" ? <button className="activity-action" onClick={() => openUpdatedPath("long-running", 1)}>View Compaction <ArrowRight size={12} /></button> : null}
-                  {proposalStatus === "dismissed" ? <button className="activity-action" onClick={() => setProposalStatus("ready")}><RotateCcw size={12} /> Restore</button> : null}
-                  {reviewOpen && proposalStatus === "ready" ? (
+                  <h2>{effectiveProposalStatus === "applied" ? "Compaction path updated" : effectiveProposalStatus === "dismissed" ? "Update dismissed" : "Compaction source changed"}</h2>
+                  <p>{effectiveProposalStatus === "applied" ? "The Compaction evidence and recall checkpoints now reflect the clarification." : effectiveProposalStatus === "dismissed" ? "The existing path was left unchanged." : "The official guide now makes one detail more precise."}</p>
+                  {effectiveProposalStatus === "ready" && !reviewOpen ? <button className="activity-action" onClick={() => setReviewOpen(true)}>Review update <ArrowRight size={12} /></button> : null}
+                  {effectiveProposalStatus === "applied" ? <button className="activity-action" onClick={() => openUpdatedPath("long-running", 1)}>View Compaction <ArrowRight size={12} /></button> : null}
+                  {effectiveProposalStatus === "dismissed" ? <button className="activity-action" onClick={() => setProposalStatus("ready")}><RotateCcw size={12} /> Restore</button> : null}
+                  {reviewOpen && effectiveProposalStatus === "ready" ? (
                     <div className="proposal-review agent-update-review">
                       <span>Proposed clarification</span>
                       <p>The compact item carries opaque model context, not a summary intended for people to read or edit.</p>
@@ -273,6 +293,22 @@ export function LearningMap({
               </article>
             </div>
           </section>
+        ) : mapMode === "notes" ? (
+          <section className="notes-index-view" aria-label="Learning notes">
+            <header className="notes-index-header">
+              <div><h1>Notes</h1><p>Ideas captured across every learning path.</p></div>
+              <span>{noteEntries.length} note{noteEntries.length === 1 ? "" : "s"} · {learnerProfile.recallAttempts} recall{learnerProfile.recallAttempts === 1 ? "" : "s"}</span>
+            </header>
+            <label className="notes-search"><Search size={15} /><input value={noteQuery} onChange={(event) => setNoteQuery(event.target.value)} placeholder="Search notes" aria-label="Search notes" /></label>
+            <div className="notes-index-list">
+              {filteredNotes.length ? filteredNotes.map((entry) => (
+                <article className="notes-index-row" key={`${entry.path.id}-${entry.conceptIndex}`}>
+                  <span className="notes-index-icon"><NotebookPen size={16} /></span>
+                  <div><small>{entry.path.title}</small><h2>{entry.concept.title}</h2><p>{entry.text}</p><button className="activity-action" onClick={() => onOpenLesson(entry.path.id, entry.conceptIndex)}>Open lesson <ArrowRight size={12} /></button></div>
+                </article>
+              )) : <div className="notes-index-empty"><NotebookPen size={18} /><strong>{noteQuery ? "No matching notes" : "No notes yet"}</strong><p>{noteQuery ? "Try another search." : "Add a note from any lesson and it will appear here."}</p></div>}
+            </div>
+          </section>
         ) : (
           <>
         <div className="map-primary">
@@ -292,7 +328,7 @@ export function LearningMap({
                 onNodeClick={(_, node) => selectPath(node.data.pathId)}
                 aria-label="Connected learning paths"
               >
-                <FitGraph version={`${proposalStatus}-${paths.map((path) => path.id).join(":")}-${compactGraph ? "compact" : "wide"}`} />
+                <FitGraph version={`${effectiveProposalStatus}-${paths.map((path) => path.id).join(":")}-${compactGraph ? "compact" : "wide"}`} />
                 <Background color="#242424" gap={28} size={1} />
                 <Controls showInteractive={false} />
               </ReactFlow>
@@ -346,11 +382,11 @@ export function LearningMap({
                 <p>{inspectedConcept.objective}</p>
               </div>
             </div>
-            {selectedPath.sources?.length ? (
+            {inspectedSources.length ? (
               <div className="selected-path-sources">
                 <span>Sources</span>
                 <ul>
-                  {selectedPath.sources.map((source) => (
+                  {inspectedSources.map((source) => (
                     <li key={source.id}>
                       {source.kind === "link" ? <Link2 size={12} /> : <FileText size={12} />}
                       {source.href ? <a href={source.href} target="_blank" rel="noreferrer"><strong>{source.title}</strong><small>{source.detail}</small></a> : <div><strong>{source.title}</strong><small>{source.detail}</small></div>}

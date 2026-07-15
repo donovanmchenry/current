@@ -26,12 +26,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { basePaths, suggestedPath } from "../lib/learning-catalog";
 import type { LearningConcept, LearningPath } from "../lib/learning-path";
 import {
+  defaultLearnerProfile,
   defaultProgress,
   defaultReviews,
   isStoredLearningPath,
   nextIncompleteConcept,
   pathWithProgress,
   progressForPath,
+  type LearnerProfile,
   type LearningRuntimeSnapshot,
   type PathProgress,
   type ReviewItem,
@@ -57,8 +59,22 @@ const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
   { id: "reflect", label: "Reflect", icon: NotebookPen },
 ];
 
-const noteExcerpt = "Compaction preserves key prior state in an opaque item while using fewer tokens.";
 const runtimeStorageKey = "current-learning-runtime-v1";
+
+function applyResearchRevision(paths: LearningPath[], applied: boolean) {
+  if (!applied) return paths;
+  return paths.map((path) => path.id !== "long-running" ? path : {
+    ...path,
+    concepts: path.concepts.map((concept, index) => index !== 1 ? concept : {
+      ...concept,
+      summary: "Compaction preserves opaque model context needed for later turns; the returned item is continuation state, not a human-readable summary.",
+      checkpoints: ["Rendered-token thresholds", "Opaque model context", "Passing compact state forward unchanged", "The next request after compaction"],
+      sourceIds: ["compaction"],
+      sourceNote: "The compact item contains opaque model context. Applications should pass it forward unchanged rather than display, edit, or interpret it as a summary.",
+      updatedAt: "2026-07-15T00:00:00.000Z",
+    }),
+  });
+}
 
 export function CurrentWorkspace() {
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("lesson");
@@ -71,6 +87,8 @@ export function CurrentWorkspace() {
   const [reviews, setReviews] = useState<ReviewItem[]>(defaultReviews);
   const [notesByConcept, setNotesByConcept] = useState<Record<string, string>>({});
   const [reflectionsByConcept, setReflectionsByConcept] = useState<Record<string, string>>({});
+  const [researchUpdateApplied, setResearchUpdateApplied] = useState(false);
+  const [learnerProfile, setLearnerProfile] = useState<LearnerProfile>(defaultLearnerProfile);
   const [mode, setMode] = useState<Mode>("read");
   const [recallAnswer, setRecallAnswer] = useState("");
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
@@ -92,10 +110,10 @@ export function CurrentWorkspace() {
   const hydrated = useRef(false);
   const lessonScrollRef = useRef<HTMLDivElement>(null);
 
-  const rawPaths = useMemo(
-    () => [...basePaths, ...(suggestedPathAdded ? [suggestedPath] : []), ...customPaths],
-    [customPaths, suggestedPathAdded],
-  );
+  const rawPaths = useMemo(() => applyResearchRevision(
+    [...basePaths, ...(suggestedPathAdded ? [suggestedPath] : []), ...customPaths],
+    researchUpdateApplied,
+  ), [customPaths, researchUpdateApplied, suggestedPathAdded]);
   const paths = useMemo(() => rawPaths.map((path) => pathWithProgress(
     path,
     progress[path.id],
@@ -109,9 +127,10 @@ export function CurrentWorkspace() {
   const conceptKey = `${activePath.id}:${safeConceptIndex}`;
   const notes = notesByConcept[conceptKey] ?? "";
   const reflection = reflectionsByConcept[conceptKey] ?? "";
-  const activeSources = activePath.sources ?? [];
+  const activeSources = (activePath.sources ?? []).filter((source) => activeConcept.sourceIds === undefined || activeConcept.sourceIds.includes(source.id));
   const isCompactionLesson = activePath.id === "long-running" && safeConceptIndex === 1;
-  const highlighted = isCompactionLesson && notes.includes(noteExcerpt);
+  const activeNoteExcerpt = activeConcept.sourceNote ?? activeConcept.objective;
+  const highlighted = isCompactionLesson && notes.includes(activeNoteExcerpt);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -128,6 +147,8 @@ export function CurrentWorkspace() {
           if (Array.isArray(saved.reviews)) setReviews(saved.reviews.filter(isStoredReview));
           if (saved.notes && typeof saved.notes === "object") setNotesByConcept(sanitizeTextRecord(saved.notes));
           if (saved.reflections && typeof saved.reflections === "object") setReflectionsByConcept(sanitizeTextRecord(saved.reflections));
+          setResearchUpdateApplied(Boolean(saved.researchUpdateApplied));
+          if (saved.learnerProfile) setLearnerProfile(sanitizeLearnerProfile(saved.learnerProfile));
         } else {
           const oldNotes = window.localStorage.getItem("current-notebook-v2") ?? "";
           const oldReflection = window.localStorage.getItem("current-reflection-v1") ?? "";
@@ -138,6 +159,8 @@ export function CurrentWorkspace() {
           if (typeof oldMap?.plannedPathId === "string") setQueue([oldMap.plannedPathId]);
           if (oldMap?.suggestionStatus === "added") setSuggestedPathAdded(true);
         }
+        const savedMapUi = JSON.parse(window.localStorage.getItem("current-learning-map-ui-v2") ?? "null") as { proposalStatus?: unknown } | null;
+        if (savedMapUi?.proposalStatus === "applied") setResearchUpdateApplied(true);
       } catch {
         window.localStorage.removeItem(runtimeStorageKey);
       }
@@ -158,9 +181,11 @@ export function CurrentWorkspace() {
       suggestedPathAdded,
       notes: notesByConcept,
       reflections: reflectionsByConcept,
+      researchUpdateApplied,
+      learnerProfile,
     };
     window.localStorage.setItem(runtimeStorageKey, JSON.stringify(snapshot));
-  }, [activePath.id, customPaths, notesByConcept, progress, queue, reflectionsByConcept, reviews, safeConceptIndex, suggestedPathAdded]);
+  }, [activePath.id, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, suggestedPathAdded]);
 
   const modeIndex = modeItems.findIndex((item) => item.id === mode);
   const recallComplete = recallPassed || lessonFinished;
@@ -184,8 +209,28 @@ export function CurrentWorkspace() {
   };
 
   const addExcerptToNotes = () => {
-    setNotes((value) => value.includes(noteExcerpt) ? value : value ? `${value}\n\n${noteExcerpt}` : noteExcerpt);
+    setNotes((value) => value.includes(activeNoteExcerpt) ? value : value ? `${value}\n\n${activeNoteExcerpt}` : activeNoteExcerpt);
     setNotebookOpen(true);
+  };
+
+  const acceptRecallEvaluation = (result: Evaluation) => {
+    const passed = result.score >= 75;
+    setEvaluation(result);
+    if (passed) setRecallPassed(true);
+    setLearnerProfile((current) => {
+      const visualSuccesses = current.visualSuccesses + Number(passed && supportMode === "visual");
+      const exampleSuccesses = current.exampleSuccesses + Number(passed && supportMode === "example");
+      const preferredSupport = visualSuccesses === exampleSuccesses
+        ? current.preferredSupport
+        : visualSuccesses > exampleSuccesses ? "visual" : "example";
+      return {
+        recallAttempts: current.recallAttempts + 1,
+        successfulRecalls: current.successfulRecalls + Number(passed),
+        visualSuccesses,
+        exampleSuccesses,
+        preferredSupport,
+      };
+    });
   };
 
   const evaluateRecall = async () => {
@@ -204,12 +249,10 @@ export function CurrentWorkspace() {
       });
       if (!response.ok) throw new Error("Evaluation failed");
       const result = (await response.json()) as Evaluation;
-      setEvaluation(result);
-      if (result.score >= 75) setRecallPassed(true);
+      acceptRecallEvaluation(result);
     } catch {
       const result = localEvaluation(recallAnswer, activeConcept);
-      setEvaluation(result);
-      if (result.score >= 75) setRecallPassed(true);
+      acceptRecallEvaluation(result);
     } finally {
       setIsEvaluating(false);
     }
@@ -262,6 +305,7 @@ export function CurrentWorkspace() {
     setNotebookOpen(false);
     setSourcesOpen(false);
     setSidebarOpen(false);
+    setActiveReviewId(null);
     setWorkspaceView("map");
   };
 
@@ -306,6 +350,24 @@ export function CurrentWorkspace() {
     setActiveReviewId(review.id);
   };
 
+  const finishReview = () => {
+    if (!activeReviewId || !evaluation) return;
+    const existingReview = reviews.find((review) => review.id === activeReviewId);
+    if (!existingReview) {
+      openLearningMap();
+      return;
+    }
+    const quality = evaluation.score >= 90 ? 5 : evaluation.score >= 75 ? 4 : evaluation.score >= 60 ? 3 : 2;
+    const scheduled = scheduleReview(existingReview.memory, quality);
+    setReviews((current) => current.map((review) => review.id !== activeReviewId ? review : {
+      ...review,
+      dueAt: scheduled.nextReview.toISOString(),
+      memory: { intervalDays: scheduled.intervalDays, ease: scheduled.ease, repetitions: scheduled.repetitions },
+      reason: "completion",
+    }));
+    openLearningMap();
+  };
+
   const continueAfterCompletion = () => {
     if (completionNextIndex !== null) {
       openLesson(activePath.id, completionNextIndex);
@@ -345,6 +407,7 @@ export function CurrentWorkspace() {
   };
 
   const applyResearchUpdate = () => {
+    setResearchUpdateApplied(true);
     const review: ReviewItem = {
       id: "review-research-long-running-1",
       pathId: "long-running",
@@ -390,11 +453,11 @@ export function CurrentWorkspace() {
           );})}
         </ol>
 
-        <div className="sidebar-bottom">
+        {activeSources.length ? <div className="sidebar-bottom">
           <div className={`sidebar-sources-viewport ${sourcesOpen ? "open" : ""}`} aria-hidden={!sourcesOpen}>
             <div className="sidebar-sources-drawer">
               <div className="sidebar-sources">
-                <div className="sidebar-sources-heading"><span>Official sources</span><small>For this concept</small></div>
+                <div className="sidebar-sources-heading"><span>Sources</span><small>For this concept</small></div>
                 {activeSources.map((source) => source.href ? (
                   <a href={source.href} target="_blank" rel="noreferrer" tabIndex={sourcesOpen ? 0 : -1} className="sidebar-source-item" key={source.id}>
                     <FileText size={14} /><span><strong>{source.title}</strong><small>{source.detail}</small></span><ExternalLink size={12} />
@@ -406,7 +469,7 @@ export function CurrentWorkspace() {
             </div>
           </div>
           <button aria-expanded={sourcesOpen} onClick={() => setSourcesOpen((value) => !value)}><FileText size={15} /><span>Sources</span><small>{activeSources.length}</small><ChevronDown className={sourcesOpen ? "expanded" : ""} size={14} /></button>
-        </div>
+        </div> : null}
       </aside>
 
       <main className="learning-canvas">
@@ -417,7 +480,10 @@ export function CurrentWorkspace() {
             queue={queue}
             progress={progress}
             reviews={reviews}
+            notesByConcept={notesByConcept}
+            learnerProfile={learnerProfile}
             suggestedPathAdded={suggestedPathAdded}
+            researchUpdateApplied={researchUpdateApplied}
             onOpenLesson={openLesson}
             onQueuePath={toggleQueue}
             onAddCustomPath={addCustomPath}
@@ -459,8 +525,8 @@ export function CurrentWorkspace() {
             <div className="lesson-scroll" ref={lessonScrollRef}>
               <div className="mode-stage">
                 {mode === "read" ? (isCompactionLesson
-                  ? <ReadModule highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} />
-                  : <GenericReadModule concept={activeConcept} path={activePath} addToNotes={() => { setNotes((value) => value.includes(activeConcept.objective) ? value : value ? `${value}\n\n${activeConcept.objective}` : activeConcept.objective); setNotebookOpen(true); }} next={() => transitionToMode("recall")} />) : null}
+                  ? <ReadModule concept={activeConcept} highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} />
+                  : <GenericReadModule concept={activeConcept} path={activePath} addToNotes={addExcerptToNotes} next={() => transitionToMode("recall")} />) : null}
                 {mode === "recall" ? (
                   <RecallModule
                     concept={activeConcept}
@@ -472,6 +538,9 @@ export function CurrentWorkspace() {
                     isEvaluating={isEvaluating}
                     supportMode={supportMode}
                     setSupportMode={setSupportMode}
+                    preferredSupport={learnerProfile.preferredSupport}
+                    reviewMode={Boolean(activeReviewId)}
+                    finishReview={finishReview}
                     reset={resetRecall}
                     next={() => transitionToMode("apply")}
                   />
@@ -549,6 +618,19 @@ function sanitizeTextRecord(value: unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 }
 
+function sanitizeLearnerProfile(value: unknown): LearnerProfile {
+  if (!value || typeof value !== "object") return defaultLearnerProfile;
+  const profile = value as Partial<LearnerProfile>;
+  const count = (candidate: unknown) => typeof candidate === "number" && Number.isFinite(candidate) ? Math.max(0, Math.round(candidate)) : 0;
+  return {
+    recallAttempts: count(profile.recallAttempts),
+    successfulRecalls: count(profile.successfulRecalls),
+    visualSuccesses: count(profile.visualSuccesses),
+    exampleSuccesses: count(profile.exampleSuccesses),
+    preferredSupport: profile.preferredSupport === "visual" || profile.preferredSupport === "example" ? profile.preferredSupport : null,
+  };
+}
+
 function isStoredReview(value: unknown): value is ReviewItem {
   if (!value || typeof value !== "object") return false;
   const review = value as Partial<ReviewItem>;
@@ -563,6 +645,8 @@ function isStoredReview(value: unknown): value is ReviewItem {
 
 function GenericReadModule({ concept, path, addToNotes, next }: { concept: LearningConcept; path: LearningPath; addToNotes: () => void; next: () => void }) {
   const checkpoints = concept.checkpoints?.length ? concept.checkpoints : [concept.objective];
+  const conceptSources = (path.sources ?? []).filter((source) => concept.sourceIds === undefined || concept.sourceIds.includes(source.id));
+  const primarySource = conceptSources.find((source) => source.href);
   return (
     <article className="lesson-module read-module">
       <header className="module-header">
@@ -580,8 +664,11 @@ function GenericReadModule({ concept, path, addToNotes, next }: { concept: Learn
         </ol>
       </section>
       <section className="source-excerpt generic-source-note">
-        <div className="excerpt-top"><span><FileText size={14} /> {path.sources?.length ? `${path.sources.length} source${path.sources.length === 1 ? "" : "s"} connected` : "Path objective"}</span></div>
-        <blockquote>{concept.objective}</blockquote>
+        <div className="excerpt-top">
+          <span><FileText size={14} /> {conceptSources.length ? "Source-backed note" : "Path objective"}</span>
+          {primarySource ? <a href={primarySource.href} target="_blank" rel="noreferrer">Open source <ExternalLink size={12} /></a> : null}
+        </div>
+        <blockquote>{concept.sourceNote ?? concept.objective}</blockquote>
         <button className="excerpt-action" onClick={addToNotes}><Highlighter size={14} /> Add to notes</button>
       </section>
       <footer className="module-footer"><span>Next, reconstruct the idea without looking back.</span><button className="continue-button" onClick={next}>Start recall <ArrowRight size={15} /></button></footer>
@@ -589,7 +676,7 @@ function GenericReadModule({ concept, path, addToNotes, next }: { concept: Learn
   );
 }
 
-function ReadModule({ highlighted, addToNotes, next }: { highlighted: boolean; addToNotes: () => void; next: () => void }) {
+function ReadModule({ concept, highlighted, addToNotes, next }: { concept: LearningConcept; highlighted: boolean; addToNotes: () => void; next: () => void }) {
   return (
     <article className="lesson-module read-module">
       <header className="module-header">
@@ -610,7 +697,7 @@ function ReadModule({ highlighted, addToNotes, next }: { highlighted: boolean; a
 
       <section className="source-excerpt">
         <div className="excerpt-top"><span><FileText size={14} /> Source-backed note</span><a href="https://developers.openai.com/api/docs/guides/compaction" target="_blank" rel="noreferrer">Open source <ExternalLink size={12} /></a></div>
-        <blockquote>Compaction reduces context size while preserving the state needed for later turns. The returned item carries forward key prior state and reasoning using fewer tokens.</blockquote>
+        <blockquote>{concept.sourceNote ?? "Compaction reduces context size while preserving the state needed for later turns. The returned item carries forward key prior state and reasoning using fewer tokens."}</blockquote>
         <button className={highlighted ? "excerpt-action added" : "excerpt-action"} disabled={highlighted} onClick={addToNotes}><Highlighter size={14} />{highlighted ? "Added to notes" : "Add to notes"}</button>
       </section>
 
@@ -637,10 +724,16 @@ function RecallModule(props: {
   isEvaluating: boolean;
   supportMode: "none" | "visual" | "example";
   setSupportMode: (mode: "visual" | "example") => void;
+  preferredSupport: "visual" | "example" | null;
+  reviewMode: boolean;
+  finishReview: () => void;
   reset: () => void;
   next: () => void;
 }) {
   const needsSupport = Boolean(props.evaluation && props.evaluation.score < 75);
+  const supportOptions = props.preferredSupport === "example"
+    ? [{ id: "example" as const, label: "Concrete example", icon: Play }, { id: "visual" as const, label: "Visual sequence", icon: ListChecks }]
+    : [{ id: "visual" as const, label: "Visual sequence", icon: ListChecks }, { id: "example" as const, label: "Concrete example", icon: Play }];
   return (
     <article className="lesson-module recall-module">
       <header className="module-header compact-header">
@@ -670,12 +763,19 @@ function RecallModule(props: {
       ) : null}
 
       {needsSupport && props.supportMode === "none" ? (
-        <div className="adapt-row"><span>Try the idea another way</span><button onClick={() => props.setSupportMode("visual")}><ListChecks size={14} /> Visual sequence</button><button onClick={() => props.setSupportMode("example")}><Play size={13} /> Concrete example</button></div>
+        <div className="adapt-row"><span>Try the idea another way</span>{supportOptions.map((option) => {
+          const Icon = option.icon;
+          return <button className={props.preferredSupport === option.id ? "preferred" : ""} onClick={() => props.setSupportMode(option.id)} key={option.id}><Icon size={14} /> {option.label}</button>;
+        })}</div>
       ) : null}
 
       <footer className="module-footer">
         {props.evaluation ? <button className="subtle-button" onClick={props.reset}><RotateCcw size={14} /> Try again</button> : <span>Current checks the concept, not exact wording.</span>}
-        {props.evaluation && !needsSupport ? <button className="continue-button" onClick={props.next}>Apply it <ArrowRight size={15} /></button> : <button className="continue-button" disabled={!props.answer.trim() || props.isEvaluating || Boolean(props.evaluation)} onClick={props.evaluate}>{props.isEvaluating ? "Checking…" : "Check understanding"}<Send size={14} /></button>}
+        {props.evaluation && props.reviewMode
+          ? <button className="continue-button" onClick={props.finishReview}>{needsSupport ? "Review tomorrow" : "Finish review"}<Check size={14} /></button>
+          : props.evaluation && !needsSupport
+            ? <button className="continue-button" onClick={props.next}>Apply it <ArrowRight size={15} /></button>
+            : <button className="continue-button" disabled={!props.answer.trim() || props.isEvaluating || Boolean(props.evaluation)} onClick={props.evaluate}>{props.isEvaluating ? "Checking…" : "Check understanding"}<Send size={14} /></button>}
       </footer>
     </article>
   );

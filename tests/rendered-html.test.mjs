@@ -89,6 +89,7 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
 test("connects the lesson shell to a functional learning map", async () => {
   const workspace = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
   const map = await readFile(new URL("../app/learning-map.tsx", import.meta.url), "utf8");
+  const createPath = await readFile(new URL("../app/create-path-dialog.tsx", import.meta.url), "utf8");
   const runtime = await readFile(new URL("../lib/learning-runtime.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
@@ -97,6 +98,11 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /<LearningMap[\s\S]*paths=\{paths\}[\s\S]*queue=\{queue\}[\s\S]*onOpenLesson=\{openLesson\}/);
   assert.match(workspace, /onStartReview=\{startReview\}/);
   assert.match(workspace, /onApplyResearchUpdate=\{applyResearchUpdate\}/);
+  assert.match(workspace, /setResearchUpdateApplied\(true\)/);
+  assert.match(workspace, /const finishReview = \(\) =>/);
+  assert.match(workspace, /scheduleReview\(existingReview\.memory, quality\)/);
+  assert.match(workspace, /learnerProfile=\{learnerProfile\}/);
+  assert.match(workspace, /activeSources\.length \? <div className="sidebar-bottom">/);
   assert.match(workspace, /workspaceView === "map" \? "map-view"/);
   assert.match(workspace, /className="concept-row"[\s\S]*onClick=\{\(\) => openLesson\(activePath\.id, index\)\}/);
   assert.match(workspace, /<GenericReadModule concept=\{activeConcept\}/);
@@ -108,9 +114,11 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /setQueue\(\(current\) => current\.includes\(pathId\)/);
   assert.match(map, /<ReactFlow[\s\S]*nodes=\{nodes\}[\s\S]*edges=\{edges\}/);
   assert.match(map, /role="tablist" aria-label="Learning map view"/);
-  assert.match(map, /type MapMode = "map" \| "list" \| "updates"/);
+  assert.match(map, /type MapMode = "map" \| "list" \| "updates" \| "notes"/);
   assert.match(map, /aria-selected=\{mapMode === "updates"\}[\s\S]*Updates/);
   assert.match(map, /className="agent-updates-view"/);
+  assert.match(map, /className="notes-index-view"/);
+  assert.match(map, /aria-label="Search notes"/);
   assert.match(map, /openUpdatedPath\("long-running", 1\)/);
   assert.match(map, /setProposalStatus\("applied"\)/);
   assert.match(map, /onApplyResearchUpdate\(\)/);
@@ -133,13 +141,15 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(runtime, /export const defaultReviews/);
   assert.match(runtime, /export function nextIncompleteConcept/);
   assert.match(runtime, /export function pathWithProgress/);
+  assert.match(runtime, /export type LearnerProfile/);
+  assert.match(createPath, /submittedLinks\.forEach\(\(link\) => form\.append\("links", link\)\)/);
   assert.doesNotMatch(map, /Checking official sources|Running now|3 agents|Research active|id: "concept-/);
   assert.match(styles, /\.current-app\.map-view \.course-sidebar[^}]*display:\s*none/s);
   assert.match(styles, /\.concept-row[^}]*cursor:\s*pointer/s);
   assert.match(styles, /\.learning-map-shell[^}]*grid-template-columns:\s*minmax\(0, 1fr\) var\(--map-rail\)/s);
   assert.match(styles, /\.map-toolbar[^}]*grid-column:\s*1[^}]*grid-row:\s*1/s);
   assert.match(styles, /\.research-rail[^}]*grid-column:\s*2[^}]*grid-row:\s*1 \/ span 2/s);
-  assert.match(styles, /\.map-view-switcher[^}]*grid-template-columns:\s*repeat\(3,/s);
+  assert.match(styles, /\.map-view-switcher[^}]*grid-template-columns:\s*repeat\(4,/s);
   assert.match(styles, /\.agent-updates-view[^}]*width:\s*min\(760px,/s);
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
   assert.match(styles, /\.review-queue-item[^}]*cursor:\s*pointer/s);
@@ -154,7 +164,7 @@ test("generates a source-derived learning path without an API key", async () => 
   form.set("subject", "Urban water systems");
   form.set("goal", "Map the technical decisions involved in planning resilient city infrastructure.");
   form.append("files", new File([
-    "# Pressure zones\nBalance elevation and delivery pressure across a distribution network.\n\n# Demand forecasting\nEstimate peak and seasonal water use.\n\n# Storage and redundancy\n",
+    "# Get started\n# Suggested\n# Search the API docs\n# Core concepts\n# Pressure zones\nBalance elevation and delivery pressure across a distribution network.\n\n# Demand forecasting\nEstimate peak and seasonal water use.\n\n# Storage and redundancy\n",
   ], "water-notes.md", { type: "text/markdown" }));
 
   const response = await worker.fetch(
@@ -169,7 +179,10 @@ test("generates a source-derived learning path without an API key", async () => 
   assert.equal(path.title, "Urban water systems");
   assert.ok(path.concepts.length >= 5);
   assert.ok(path.concepts.some((concept) => /Pressure zones/i.test(concept.title)));
+  assert.ok(path.concepts.every((concept) => !/^(?:Get started|Suggested|Search the API docs|Core concepts)$/i.test(concept.title)));
   assert.ok(path.concepts.every((concept) => concept.objective.length > 10));
+  assert.ok(path.concepts.some((concept) => concept.sourceIds?.includes("file-0-water-notes.md")));
+  assert.ok(path.concepts.some((concept) => concept.sourceNote?.length > 20));
 });
 
 test("rejects private learning-path source URLs", async () => {

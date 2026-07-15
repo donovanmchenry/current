@@ -25,6 +25,24 @@ export type LearningRuntimeSnapshot = {
   suggestedPathAdded: boolean;
   notes: Record<string, string>;
   reflections: Record<string, string>;
+  researchUpdateApplied?: boolean;
+  learnerProfile?: LearnerProfile;
+};
+
+export type LearnerProfile = {
+  recallAttempts: number;
+  successfulRecalls: number;
+  visualSuccesses: number;
+  exampleSuccesses: number;
+  preferredSupport: "visual" | "example" | null;
+};
+
+export const defaultLearnerProfile: LearnerProfile = {
+  recallAttempts: 0,
+  successfulRecalls: 0,
+  visualSuccesses: 0,
+  exampleSuccesses: 0,
+  preferredSupport: null,
 };
 
 export const defaultProgress: Record<string, PathProgress> = {
@@ -96,7 +114,11 @@ export function isStoredLearningPath(value: unknown): value is LearningPath {
   const path = value as Partial<LearningPath>;
   if (!path.userCreated || typeof path.id !== "string" || !path.id.startsWith("custom-") || typeof path.title !== "string" || typeof path.description !== "string") return false;
   if (typeof path.progress !== "number" || typeof path.next !== "string" || typeof path.status !== "string" || !Array.isArray(path.concepts) || path.concepts.length < 1) return false;
-  if (!path.concepts.every((concept) => concept && typeof concept.title === "string" && typeof concept.objective === "string")) return false;
+  if (!path.concepts.every((concept) => concept
+    && typeof concept.title === "string"
+    && typeof concept.objective === "string"
+    && (!concept.sourceIds || (Array.isArray(concept.sourceIds) && concept.sourceIds.every((id) => typeof id === "string")))
+    && (!concept.sourceNote || typeof concept.sourceNote === "string"))) return false;
   if (path.sources && (!Array.isArray(path.sources) || !path.sources.every((source) => {
     if (!source || typeof source.id !== "string" || typeof source.title !== "string" || (source.kind !== "file" && source.kind !== "link")) return false;
     if (!source.href) return true;

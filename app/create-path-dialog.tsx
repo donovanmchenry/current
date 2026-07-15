@@ -26,6 +26,16 @@ function linkTitle(value: string) {
   }
 }
 
+function canonicalSourceLink(value: string) {
+  try {
+    const parsed = new URL(value.trim());
+    if (parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogProps) {
   const [subject, setSubject] = useState("");
   const [goal, setGoal] = useState("");
@@ -61,24 +71,22 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
   const addLink = () => {
     const value = linkInput.trim();
     if (!value) return;
-    try {
-      const parsed = new URL(value);
-      if (parsed.protocol !== "https:") throw new Error();
-      const canonical = parsed.toString();
-      if (links.includes(canonical)) {
-        setLinkInput("");
-        return;
-      }
-      if (links.length >= 4) {
-        setError("You can add up to four links.");
-        return;
-      }
-      setLinks((current) => [...current, canonical]);
-      setLinkInput("");
-      resetGenerated();
-    } catch {
+    const canonical = canonicalSourceLink(value);
+    if (!canonical) {
       setError("Enter a public HTTPS link.");
+      return;
     }
+    if (links.includes(canonical)) {
+      setLinkInput("");
+      return;
+    }
+    if (links.length >= 4) {
+      setError("You can add up to four links.");
+      return;
+    }
+    setLinks((current) => [...current, canonical]);
+    setLinkInput("");
+    resetGenerated();
   };
 
   const addFiles = (incoming: File[]) => {
@@ -114,12 +122,28 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
       return;
     }
 
+    let submittedLinks = links;
+    if (linkInput.trim()) {
+      const pendingLink = canonicalSourceLink(linkInput);
+      if (!pendingLink) {
+        setError("Enter a public HTTPS link.");
+        return;
+      }
+      submittedLinks = links.includes(pendingLink) ? links : [...links, pendingLink];
+      if (submittedLinks.length > 4) {
+        setError("You can add up to four links.");
+        return;
+      }
+      setLinks(submittedLinks);
+      setLinkInput("");
+    }
+
     setIsGenerating(true);
     setError(null);
     const form = new FormData();
     form.set("subject", subject.trim());
     form.set("goal", goal.trim());
-    links.forEach((link) => form.append("links", link));
+    submittedLinks.forEach((link) => form.append("links", link));
     files.forEach((file) => form.append("files", file));
 
     try {
