@@ -503,11 +503,15 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .selected-path-outline li > button div, .selected-path-outline li > button strong, .selected-path-outline li > button small { display: block; min-width: 0; }
 .selected-path-outline li > button strong { overflow: hidden; font-size: 10px; font-weight: 550; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .selected-path-outline li > button small { margin-top: 2px; color: var(--text-muted); font-size: 8px; }
+.selected-path-outline li.needs-attention > button small { color: var(--accent-bright); }
 .selected-concept-detail { margin-top: 12px; padding: 5px 6px 0; }
 .selected-concept-detail > span, .selected-concept-detail > strong { display: block; }
 .selected-concept-detail > span { color: var(--accent-bright); font-size: 9px; }
 .selected-concept-detail > strong { margin-top: 5px; color: var(--text); font-size: 11px; font-weight: 560; }
 .selected-concept-detail > p { margin: 6px 0 0; color: var(--text-muted); font-size: 9px; line-height: 1.5; }
+.selected-concept-memory { margin-top: 10px; border-radius: 6px; padding: 9px 10px; background: #141414; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); }
+.selected-concept-memory > span { display: block; color: var(--accent-bright); font-size: 9px; font-weight: 550; }
+.selected-concept-memory > p { margin: 5px 0 0; color: var(--text-secondary); font-size: 9px; line-height: 1.5; }
 .selected-path-sources ul { display: grid; gap: 4px; }
 .selected-path-sources li { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: start; gap: 6px; padding: 5px 0; color: var(--text-muted); }
 .selected-path-sources li > svg { margin-top: 1px; }

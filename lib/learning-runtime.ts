@@ -15,6 +15,15 @@ export type ReviewItem = {
   reason: "completion" | "research";
 };
 
+export type ConceptMemory = {
+  attempts: number;
+  successfulRecalls: number;
+  lastScore: number;
+  lastMisconception: string | null;
+  preferredSupport: "visual" | "example" | null;
+  updatedAt: string;
+};
+
 export type LearningRuntimeSnapshot = {
   activePathId: string;
   activeConceptIndex: number;
@@ -29,6 +38,7 @@ export type LearningRuntimeSnapshot = {
   sourceUpdates?: SourceUpdateProposal[];
   researchUpdateApplied?: boolean;
   learnerProfile?: LearnerProfile;
+  conceptMemories?: Record<string, ConceptMemory>;
 };
 
 export type CheckedSourceSnapshot = {
@@ -115,6 +125,30 @@ export function nextIncompleteConcept(path: LearningPath, progress: PathProgress
 
 export function isDue(review: ReviewItem, now = new Date()) {
   return new Date(review.dueAt).getTime() <= now.getTime();
+}
+
+export function updateConceptMemory(
+  current: ConceptMemory | undefined,
+  result: { score: number; misconception: string | null; supportMode: "none" | "visual" | "example" },
+  updatedAt = new Date(),
+): ConceptMemory {
+  const passed = result.score >= 75;
+  return {
+    attempts: (current?.attempts ?? 0) + 1,
+    successfulRecalls: (current?.successfulRecalls ?? 0) + Number(passed),
+    lastScore: Math.max(0, Math.min(100, Math.round(result.score))),
+    lastMisconception: passed ? null : result.misconception ?? current?.lastMisconception ?? "Rebuild this concept before the next session.",
+    preferredSupport: passed && result.supportMode !== "none" ? result.supportMode : current?.preferredSupport ?? null,
+    updatedAt: updatedAt.toISOString(),
+  };
+}
+
+export function reviewQualityForAttempt(score: number, attemptsThisSession: number) {
+  const boundedScore = Math.max(0, Math.min(100, score));
+  const attempts = Math.max(1, Math.round(attemptsThisSession));
+  if (boundedScore < 75) return 2;
+  if (attempts > 1) return 3;
+  return boundedScore >= 90 ? 5 : 4;
 }
 
 export function isStoredLearningPath(value: unknown): value is LearningPath {

@@ -40,7 +40,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { suggestedPath } from "@/lib/learning-catalog";
 import type { LearningPath, LearningSource, SourceSnapshot, SourceUpdateProposal } from "@/lib/learning-path";
-import { isDue, progressForPath, type LearnerProfile, type PathProgress, type ReviewItem } from "@/lib/learning-runtime";
+import { isDue, progressForPath, type ConceptMemory, type LearnerProfile, type PathProgress, type ReviewItem } from "@/lib/learning-runtime";
 import { selectBackgroundSource } from "@/lib/source-monitor";
 import { CreatePathDialog } from "./create-path-dialog";
 
@@ -75,6 +75,7 @@ type LearningMapProps = {
   reviews: ReviewItem[];
   notesByConcept: Record<string, string>;
   learnerProfile: LearnerProfile;
+  conceptMemories: Record<string, ConceptMemory>;
   suggestedPathAdded: boolean;
   researchUpdateApplied: boolean;
   sourceUpdates: SourceUpdateProposal[];
@@ -97,6 +98,7 @@ export function LearningMap({
   reviews,
   notesByConcept,
   learnerProfile,
+  conceptMemories,
   suggestedPathAdded,
   researchUpdateApplied,
   sourceUpdates,
@@ -132,6 +134,7 @@ export function LearningMap({
   const selectedProgress = progressForPath(selectedPath, progress[selectedPath.id]);
   const inspectedConceptIndex = Math.max(0, Math.min(selectedConceptIndex, selectedPath.concepts.length - 1));
   const inspectedConcept = selectedPath.concepts[inspectedConceptIndex];
+  const inspectedConceptMemory = conceptMemories[`${selectedPath.id}:${inspectedConceptIndex}`];
   const inspectedSources = (selectedPath.sources ?? []).filter((source) => inspectedConcept.sourceIds === undefined || inspectedConcept.sourceIds.includes(source.id));
   const inspectedConceptState = selectedProgress.completedConceptIndexes.includes(inspectedConceptIndex)
     ? "done"
@@ -453,9 +456,10 @@ export function LearningMap({
               <ol>
                 {selectedPath.concepts.map((concept, index) => {
                   const conceptState = selectedProgress.completedConceptIndexes.includes(index) ? "done" : index === selectedProgress.currentConceptIndex ? "current" : "upcoming";
-                  const conceptLabel = conceptState === "done" ? "Completed" : conceptState === "current" ? (selectedPathIsActive ? "Current" : "Next") : "Upcoming";
+                  const memory = conceptMemories[`${selectedPath.id}:${index}`];
+                  const conceptLabel = memory?.lastMisconception ? "Needs attention" : conceptState === "done" ? "Completed" : conceptState === "current" ? (selectedPathIsActive ? "Current" : "Next") : "Upcoming";
                   return (
-                    <li className={`${conceptState} ${inspectedConceptIndex === index ? "selected" : ""}`} key={`${selectedPath.id}-${concept.title}`}>
+                    <li className={`${conceptState} ${memory?.lastMisconception ? "needs-attention" : ""} ${inspectedConceptIndex === index ? "selected" : ""}`} key={`${selectedPath.id}-${concept.title}`}>
                       <button aria-pressed={inspectedConceptIndex === index} onClick={() => setSelectedConceptIndex(index)}>
                         <span>{conceptState === "done" ? <Check size={10} /> : index + 1}</span>
                         <div><strong>{concept.title}</strong><small>{conceptLabel}</small></div>
@@ -469,6 +473,12 @@ export function LearningMap({
                 <strong>{inspectedConcept.title}</strong>
                 <p>{inspectedConcept.objective}</p>
               </div>
+              {inspectedConceptMemory?.lastMisconception ? (
+                <div className="selected-concept-memory">
+                  <span>Recall gap</span>
+                  <p>{inspectedConceptMemory.lastMisconception}</p>
+                </div>
+              ) : null}
             </div>
             {inspectedSources.length ? (
               <div className="selected-path-sources">

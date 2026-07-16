@@ -108,6 +108,10 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /const finishReview = \(\) =>/);
   assert.match(workspace, /scheduleReview\(existingReview\.memory, quality\)/);
   assert.match(workspace, /learnerProfile=\{learnerProfile\}/);
+  assert.match(workspace, /conceptMemories=\{conceptMemories\}/);
+  assert.match(workspace, /updateConceptMemory\(current\[conceptKey\]/);
+  assert.match(workspace, /reviewQualityForAttempt\(evaluation\?\.score \?\? 75, recallAttemptsThisSession\)/);
+  assert.match(workspace, /sanitizeConceptMemories\(saved\.conceptMemories\)/);
   assert.match(workspace, /activeSources\.length \? <div className="sidebar-bottom">/);
   assert.match(workspace, /workspaceView === "map" \? "map-view"/);
   assert.match(workspace, /className="concept-row"[\s\S]*onClick=\{\(\) => openLesson\(activePath\.id, index\)\}/);
@@ -170,6 +174,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   const researchRail = map.match(/<aside className=\{`research-rail map-rail-enter[\s\S]*?<\/aside>/)?.[0] ?? "";
   assert.doesNotMatch(researchRail, /New path|rail-create-path/);
   assert.match(researchRail, /Review queue/);
+  assert.match(researchRail, /selected-concept-memory[\s\S]*Recall gap/);
   assert.doesNotMatch(researchRail, /Agent updates|agent-update-row|research-activity/);
   assert.match(runtime, /export const defaultReviews/);
   assert.match(runtime, /export function nextIncompleteConcept/);
@@ -205,6 +210,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(styles, /\.agent-updates-view[^}]*width:\s*min\(760px,/s);
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
   assert.match(styles, /\.review-queue-item[^}]*cursor:\s*pointer/s);
+  assert.match(styles, /\.selected-concept-memory[^}]*border-radius:\s*6px[^}]*background:\s*#141414/s);
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.learning-map-body[^}]*display:\s*block[^}]*overflow-y:\s*auto/s);
 });
 

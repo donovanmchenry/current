@@ -36,7 +36,10 @@ import {
   nextIncompleteConcept,
   pathWithProgress,
   progressForPath,
+  reviewQualityForAttempt,
+  updateConceptMemory,
   type CheckedSourceSnapshot,
+  type ConceptMemory,
   type LearnerProfile,
   type LearningRuntimeSnapshot,
   type PathProgress,
@@ -139,9 +142,11 @@ export function CurrentWorkspace() {
   const [checkedSources, setCheckedSources] = useState<CheckedSourceSnapshot[]>([]);
   const [sourceUpdates, setSourceUpdates] = useState<SourceUpdateProposal[]>([]);
   const [learnerProfile, setLearnerProfile] = useState<LearnerProfile>(defaultLearnerProfile);
+  const [conceptMemories, setConceptMemories] = useState<Record<string, ConceptMemory>>({});
   const [mode, setMode] = useState<Mode>("read");
   const [recallAnswer, setRecallAnswer] = useState("");
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [recallAttemptsThisSession, setRecallAttemptsThisSession] = useState(0);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [supportMode, setSupportMode] = useState<"none" | "visual" | "example">("none");
   const [codeChoice, setCodeChoice] = useState<number | null>(null);
@@ -181,6 +186,7 @@ export function CurrentWorkspace() {
   const activeConcept = activePath.concepts[safeConceptIndex];
   const activeLesson = activeConcept.lesson;
   const conceptKey = `${activePath.id}:${safeConceptIndex}`;
+  const conceptMemory = conceptMemories[conceptKey];
   const notes = notesByConcept[conceptKey] ?? "";
   const reflection = reflectionsByConcept[conceptKey] ?? "";
   const activeSources = (activePath.sources ?? []).filter((source) => activeConcept.sourceIds === undefined || activeConcept.sourceIds.includes(source.id));
@@ -207,6 +213,7 @@ export function CurrentWorkspace() {
           if (Array.isArray(saved.sourceUpdates)) setSourceUpdates(saved.sourceUpdates.filter(isStoredSourceUpdate).slice(-30));
           setResearchUpdateApplied(Boolean(saved.researchUpdateApplied));
           if (saved.learnerProfile) setLearnerProfile(sanitizeLearnerProfile(saved.learnerProfile));
+          if (saved.conceptMemories) setConceptMemories(sanitizeConceptMemories(saved.conceptMemories));
         } else {
           const oldNotes = window.localStorage.getItem("current-notebook-v2") ?? "";
           const oldReflection = window.localStorage.getItem("current-reflection-v1") ?? "";
@@ -243,9 +250,10 @@ export function CurrentWorkspace() {
       sourceUpdates,
       researchUpdateApplied,
       learnerProfile,
+      conceptMemories,
     };
     window.localStorage.setItem(runtimeStorageKey, JSON.stringify(snapshot));
-  }, [activePath.id, checkedSources, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, sourceUpdates, suggestedPathAdded]);
+  }, [activePath.id, checkedSources, conceptMemories, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, sourceUpdates, suggestedPathAdded]);
 
   useEffect(() => {
     if (workspaceView !== "lesson" || !activePath.userCreated || activeLesson) return;
@@ -309,7 +317,16 @@ export function CurrentWorkspace() {
   const acceptRecallEvaluation = (result: Evaluation) => {
     const passed = result.score >= 75;
     setEvaluation(result);
+    setRecallAttemptsThisSession((current) => current + 1);
     if (passed) setRecallPassed(true);
+    setConceptMemories((current) => ({
+      ...current,
+      [conceptKey]: updateConceptMemory(current[conceptKey], {
+        score: result.score,
+        misconception: result.misconception,
+        supportMode,
+      }),
+    }));
     setLearnerProfile((current) => {
       const visualSuccesses = current.visualSuccesses + Number(passed && supportMode === "visual");
       const exampleSuccesses = current.exampleSuccesses + Number(passed && supportMode === "example");
@@ -409,7 +426,8 @@ export function CurrentWorkspace() {
   const finishAndSchedule = () => {
     const existingReview = reviews.find((review) => review.id === activeReviewId)
       ?? reviews.find((review) => review.pathId === activePath.id && review.conceptIndex === safeConceptIndex);
-    const scheduled = scheduleReview(existingReview?.memory ?? { intervalDays: 1, ease: 2.5, repetitions: 0 }, 4);
+    const quality = reviewQualityForAttempt(evaluation?.score ?? 75, recallAttemptsThisSession);
+    const scheduled = scheduleReview(existingReview?.memory ?? { intervalDays: 1, ease: 2.5, repetitions: 0 }, quality);
     const review: ReviewItem = {
       id: existingReview?.id ?? `review-${activePath.id}-${safeConceptIndex}`,
       pathId: activePath.id,
@@ -444,6 +462,7 @@ export function CurrentWorkspace() {
     setMode(nextMode);
     setRecallAnswer("");
     setEvaluation(null);
+    setRecallAttemptsThisSession(0);
     setIsEvaluating(false);
     setSupportMode("none");
     setCodeChoice(null);
@@ -496,7 +515,7 @@ export function CurrentWorkspace() {
       openLearningMap();
       return;
     }
-    const quality = evaluation.score >= 90 ? 5 : evaluation.score >= 75 ? 4 : evaluation.score >= 60 ? 3 : 2;
+    const quality = reviewQualityForAttempt(evaluation.score, recallAttemptsThisSession);
     const scheduled = scheduleReview(existingReview.memory, quality);
     setReviews((current) => current.map((review) => review.id !== activeReviewId ? review : {
       ...review,
@@ -536,6 +555,7 @@ export function CurrentWorkspace() {
     setQueue((current) => current.filter((item) => item !== pathId));
     setReviews((current) => current.filter((review) => review.pathId !== pathId));
     setProgress((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== pathId)));
+    setConceptMemories((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${pathId}:`))));
     if (activePath.id === pathId) {
       setActivePathId("long-running");
       setActiveConceptIndex(1);
@@ -649,6 +669,7 @@ export function CurrentWorkspace() {
             reviews={reviews}
             notesByConcept={notesByConcept}
             learnerProfile={learnerProfile}
+            conceptMemories={conceptMemories}
             suggestedPathAdded={suggestedPathAdded}
             researchUpdateApplied={researchUpdateApplied}
             sourceUpdates={sourceUpdates}
@@ -711,7 +732,7 @@ export function CurrentWorkspace() {
                     isEvaluating={isEvaluating}
                     supportMode={supportMode}
                     setSupportMode={setSupportMode}
-                    preferredSupport={learnerProfile.preferredSupport}
+                    preferredSupport={conceptMemory?.preferredSupport ?? learnerProfile.preferredSupport}
                     reviewMode={Boolean(activeReviewId)}
                     finishReview={finishReview}
                     reset={resetRecall}
@@ -817,6 +838,27 @@ function sanitizeLearnerProfile(value: unknown): LearnerProfile {
     exampleSuccesses: count(profile.exampleSuccesses),
     preferredSupport: profile.preferredSupport === "visual" || profile.preferredSupport === "example" ? profile.preferredSupport : null,
   };
+}
+
+function sanitizeConceptMemories(value: unknown): Record<string, ConceptMemory> {
+  if (!value || typeof value !== "object") return {};
+  const memories: Record<string, ConceptMemory> = {};
+  for (const [key, candidate] of Object.entries(value)) {
+    if (!key.includes(":") || !candidate || typeof candidate !== "object") continue;
+    const memory = candidate as Partial<ConceptMemory>;
+    if (typeof memory.attempts !== "number" || typeof memory.successfulRecalls !== "number" || typeof memory.lastScore !== "number" || typeof memory.updatedAt !== "string") continue;
+    if (memory.lastMisconception !== null && typeof memory.lastMisconception !== "string") continue;
+    if (memory.preferredSupport !== null && memory.preferredSupport !== "visual" && memory.preferredSupport !== "example") continue;
+    memories[key] = {
+      attempts: Math.max(0, Math.round(memory.attempts)),
+      successfulRecalls: Math.max(0, Math.round(memory.successfulRecalls)),
+      lastScore: Math.max(0, Math.min(100, Math.round(memory.lastScore))),
+      lastMisconception: memory.lastMisconception,
+      preferredSupport: memory.preferredSupport,
+      updatedAt: Number.isNaN(new Date(memory.updatedAt).getTime()) ? new Date(0).toISOString() : memory.updatedAt,
+    };
+  }
+  return memories;
 }
 
 function isStoredReview(value: unknown): value is ReviewItem {
