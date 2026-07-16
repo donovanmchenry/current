@@ -123,6 +123,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /current-learning-runtime-v1/);
   assert.match(workspace, /setQueue\(\(current\) => current\.includes\(pathId\)/);
   assert.match(map, /<ReactFlow[\s\S]*nodes=\{nodes\}[\s\S]*edges=\{edges\}/);
+  assert.match(map, /proOptions=\{\{ hideAttribution: true \}\}/);
   assert.match(map, /role="tablist" aria-label="Learning map view"/);
   assert.match(map, /const switchMapMode = \(nextMode: MapMode\) =>/);
   assert.match(map, /map-transition-\$\{mapTransitionDirection\}/);

@@ -411,6 +411,7 @@ export function LearningMap({
                 fitViewOptions={{ padding: 0.15, maxZoom: 1.05 }}
                 minZoom={0.32}
                 maxZoom={1.35}
+                proOptions={{ hideAttribution: true }}
                 onNodeClick={(_, node) => selectPath(node.data.pathId)}
                 aria-label="Connected learning paths"
               >
