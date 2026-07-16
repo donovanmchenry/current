@@ -110,6 +110,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /learnerProfile=\{learnerProfile\}/);
   assert.match(workspace, /conceptMemories=\{conceptMemories\}/);
   assert.match(workspace, /updateConceptMemory\(current\[conceptKey\]/);
+  assert.match(workspace, /misconception: result\.misconception \?\? \(passed \? null : result\.feedback\)/);
   assert.match(workspace, /reviewQualityForAttempt\(evaluation\?\.score \?\? 75, recallAttemptsThisSession\)/);
   assert.match(workspace, /sanitizeConceptMemories\(saved\.conceptMemories\)/);
   assert.match(workspace, /activeSources\.length \? <div className="sidebar-bottom">/);

@@ -323,7 +323,7 @@ export function CurrentWorkspace() {
       ...current,
       [conceptKey]: updateConceptMemory(current[conceptKey], {
         score: result.score,
-        misconception: result.misconception,
+        misconception: result.misconception ?? (passed ? null : result.feedback),
         supportMode,
       }),
     }));
