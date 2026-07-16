@@ -138,7 +138,6 @@ export function LearningMap({
     : inspectedConceptIndex === selectedProgress.currentConceptIndex ? "current" : "upcoming";
   const selectedPathIsActive = selectedPath.id === activePathId;
   const inspectedConceptLabel = inspectedConceptState === "done" ? "Completed" : inspectedConceptState === "current" ? (selectedPathIsActive ? "Current" : "Next") : "Upcoming";
-  const plannedPath = paths.find((path) => path.id === queue[0]);
   const dueReviews = reviews.filter((review) => isDue(review) && paths.some((path) => path.id === review.pathId));
   const pendingUpdates = sourceUpdates.filter((update) => update.status === "ready").length + Number(effectiveSuggestionStatus === "ready");
   const fullViewActive = mapMode === "updates" || mapMode === "notes";
@@ -419,7 +418,7 @@ export function LearningMap({
                 <Background color="#242424" gap={28} size={1} />
                 <Controls showInteractive={false} />
               </ReactFlow>
-              <div className="graph-status"><span>{paths.length} paths</span><span>{paths.reduce((total, path) => total + path.concepts.length, 0)} concepts</span>{plannedPath ? <span>Next: {plannedPath.title}</span> : null}</div>
+              <button className="map-create-path" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={14} /><span>New path</span></button>
             </div>
             <ul className={`learning-path-list map-surface ${mapMode === "list" ? "active" : ""}`} aria-hidden={mapMode !== "list"} aria-label="Learning paths">
               {paths.map((path) => {
@@ -435,15 +434,15 @@ export function LearningMap({
                   </li>
                 );
               })}
+              <li className="path-list-create">
+                <button aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={15} /><span>New path</span></button>
+              </li>
             </ul>
         </div>
 
         <aside className={`research-rail map-rail-enter ${fullViewActive ? "workspace-hidden" : "workspace-active"}`}>
           <section className="selected-path-panel">
-            <div className="selected-path-header">
-              <span className="rail-label">Selected path</span>
-              <button className="rail-create-path" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={12} /><span>New path</span></button>
-            </div>
+            <span className="rail-label">Selected path</span>
             <div className="selected-path-title"><FolderOpen size={16} /><div><strong>{selectedPath.title}</strong><small>{selectedPath.status}</small></div></div>
             <p>{selectedPath.description}</p>
             <div className="selected-path-progress"><span><i style={{ width: `${selectedPath.progress}%` }} /></span><small>{selectedPath.progress}% mastered</small></div>
