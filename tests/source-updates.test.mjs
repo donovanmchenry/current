@@ -5,6 +5,7 @@ import {
   createSourceSnapshot,
   fallbackSourceUpdate,
   hasMeaningfulSourceChange,
+  truncateSourceText,
 } from "../lib/source-updates.ts";
 
 const concepts = [
@@ -31,6 +32,13 @@ test("normalizes snapshots and ignores formatting-only changes", () => {
 
   assert.equal(previous.fingerprint, latest.fingerprint);
   assert.equal(hasMeaningfulSourceChange(previous, latest), false);
+});
+
+test("shortens model text at a word boundary", () => {
+  const shortened = truncateSourceText("Compaction preserves prior state and reasoning without exposing the opaque payload to people.", 52);
+
+  assert.equal(shortened, "Compaction preserves prior state and reasoning...");
+  assert.ok(shortened.length <= 52);
 });
 
 test("detects new source evidence and prepares a reviewable concept patch", () => {

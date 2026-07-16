@@ -137,6 +137,10 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /learning-path-list map-surface/);
   assert.match(map, /aria-label="Search notes"/);
   assert.match(map, /fetch\("\/api\/sources\/refresh"/);
+  assert.match(map, /selectBackgroundSource\(paths, sourceUpdates, activePathId\)/);
+  assert.match(map, /window\.sessionStorage\.setItem\(sourceAgentSessionKey/);
+  assert.match(map, /refreshSource\(backgroundSource\.path, backgroundSource\.source, "agent"\)/);
+  assert.match(map, /Research agent checking/);
   assert.match(map, /aria-label="Tracked sources"/);
   assert.match(map, /Review evidence/);
   assert.match(map, /Apply update/);
@@ -168,7 +172,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(createPath, /submittedLinks\.forEach\(\(link\) => form\.append\("links", link\)\)/);
   assert.match(refreshSource, /model: "gpt-5\.6-sol"/);
   assert.match(refreshSource, /reasoning: \{ effort: "high" \}/);
-  assert.match(refreshSource, /max_output_tokens: 4000/);
+  assert.match(refreshSource, /max_output_tokens: 8000/);
   assert.doesNotMatch(map, /Checking official sources|Running now|3 agents|Research active|id: "concept-/);
   assert.match(styles, /\.current-app\.map-view \.course-sidebar[^}]*display:\s*none/s);
   assert.match(styles, /\.concept-row[^}]*cursor:\s*pointer/s);

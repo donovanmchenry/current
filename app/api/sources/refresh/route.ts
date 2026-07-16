@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { LearningConcept, LearningSource, SourceConceptPatch, SourceUpdateProposal } from "@/lib/learning-path";
-import { createSourceSnapshot, fallbackSourceUpdate, hasMeaningfulSourceChange } from "@/lib/source-updates";
+import { createSourceSnapshot, fallbackSourceUpdate, hasMeaningfulSourceChange, truncateSourceText } from "@/lib/source-updates";
 
 type RefreshRequest = {
   pathId?: string;
@@ -90,16 +90,16 @@ function validateLiveProposal(value: unknown, fallback: SourceUpdateProposal, co
       && typeof patch.summary === "string" && typeof patch.sourceNote === "string" && Array.isArray(patch.checkpoints),
   )).slice(0, 3).map((patch) => ({
     conceptIndex: patch.conceptIndex,
-    summary: patch.summary.replace(/\s+/g, " ").trim().slice(0, 360),
-    sourceNote: patch.sourceNote.replace(/\s+/g, " ").trim().slice(0, 420),
-    checkpoints: patch.checkpoints.filter((item): item is string => typeof item === "string").map((item) => item.replace(/\s+/g, " ").trim().slice(0, 140)).filter(Boolean).slice(0, 5),
+    summary: truncateSourceText(patch.summary, 360),
+    sourceNote: truncateSourceText(patch.sourceNote, 420),
+    checkpoints: patch.checkpoints.filter((item): item is string => typeof item === "string").map((item) => truncateSourceText(item, 160)).filter(Boolean).slice(0, 5),
   }));
   if (!indexes.length || !patches.length) return null;
   return {
     ...fallback,
-    summary: proposal.summary.replace(/\s+/g, " ").trim().slice(0, 420),
-    beforeExcerpt: proposal.beforeExcerpt.replace(/\s+/g, " ").trim().slice(0, 420),
-    afterExcerpt: proposal.afterExcerpt.replace(/\s+/g, " ").trim().slice(0, 420),
+    summary: truncateSourceText(proposal.summary, 420),
+    beforeExcerpt: truncateSourceText(proposal.beforeExcerpt, 420),
+    afterExcerpt: truncateSourceText(proposal.afterExcerpt, 420),
     affectedConceptIndexes: indexes,
     patches,
     mode: "live",
@@ -142,15 +142,15 @@ export async function POST(request: Request) {
           model: "gpt-5.6-sol",
           reasoning: { effort: "high" },
           store: false,
-          max_output_tokens: 4000,
+          max_output_tokens: 8000,
           input: [
             {
               role: "system",
-              content: "You are Current's curriculum update agent. Compare the stored and refreshed source snapshots. Report only meaningful changes in claims, instructions, scope, or terminology that affect the supplied learning concepts. Cite the exact old and new evidence through concise excerpts. Patch only affected concepts, preserving their intent while updating summary, source note, and testable checkpoints. Do not treat navigation, formatting, or boilerplate changes as curriculum changes.",
+              content: "You are Current's curriculum update agent. Compare the stored and refreshed source snapshots. Report only meaningful changes in claims, instructions, scope, or terminology that affect the supplied learning concepts. Cite the exact old and new evidence through concise excerpts. Patch only affected concepts, preserving their intent while updating summary, source note, and testable checkpoints. Do not treat navigation, formatting, or boilerplate changes as curriculum changes. Keep every field concise and always complete the required JSON object.",
             },
             {
               role: "user",
-              content: JSON.stringify({ pathTitle: body.pathTitle, source: { id: source.id, title: source.title, href: source.href }, previousContent: previous?.content ?? "No stored snapshot", latestContent: latest.content, concepts }),
+              content: JSON.stringify({ pathTitle: body.pathTitle, source: { id: source.id, title: source.title, href: source.href }, previousContent: previous?.content.slice(0, 20_000) ?? "No stored snapshot", latestContent: latest.content.slice(0, 20_000), concepts }),
             },
           ],
           text: {

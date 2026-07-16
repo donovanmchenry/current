@@ -990,4 +990,10 @@ Creating a path is a primary workflow, not an agent suggestion disguised as one.
 
 Created paths persist locally with their concept objectives and source references. They appear in Map and List views, can be inspected, queued next, and removed with confirmation. GPT-5.6 Sol performs the source-grounded generation when an API key is configured; the no-key demo path derives its outline from action phrases, source headings, file headings, and conservative domain prerequisites.
 
-Known next boundary: path creation is now real, but entering a user-created concept still needs a dynamic Read, Recall, Apply, Reflect lesson generated from that path's sources. Uploaded file contents are used during generation but the original binary is not yet stored for later reopening.
+User-created concepts now enter a dynamic Read, Recall, Apply, Reflect lesson generated from the path and its sources. Uploaded text is retained as a source snapshot for later lesson generation; preserving and reopening the original uploaded binary remains outside the MVP.
+
+## Bounded Research Agent
+
+The MVP research agent checks one stale linked source when the learning map becomes active. It prioritizes the active path, runs at most once per browser session, and pauses when another source update already awaits review. This keeps the behavior genuinely autonomous without creating an unbounded crawl, hidden token spend, or a pile of unattended proposals.
+
+The agent uses the same inspectable evidence delta and apply-or-dismiss workflow as a manual source check. Scheduled server-side monitoring and notifications remain a post-MVP capability that will require durable hosted state rather than browser-local scheduling.

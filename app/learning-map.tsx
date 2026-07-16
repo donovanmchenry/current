@@ -36,17 +36,18 @@ import {
   type NodeTypes,
   useReactFlow,
 } from "@xyflow/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { suggestedPath } from "@/lib/learning-catalog";
 import type { LearningPath, LearningSource, SourceSnapshot, SourceUpdateProposal } from "@/lib/learning-path";
 import { isDue, progressForPath, type LearnerProfile, type PathProgress, type ReviewItem } from "@/lib/learning-runtime";
+import { selectBackgroundSource } from "@/lib/source-monitor";
 import { CreatePathDialog } from "./create-path-dialog";
 
 type MapMode = "map" | "list" | "updates" | "notes";
 type MapTransitionDirection = "forward" | "backward";
 type SuggestionStatus = "ready" | "added" | "dismissed";
-type SourceRefreshState = { key: string; status: "checking" | "unchanged" | "error"; message?: string };
+type SourceRefreshState = { key: string; status: "checking" | "unchanged" | "error"; trigger: "agent" | "manual"; message?: string };
 
 type LearningNodeData = Record<string, unknown> & {
   title: string;
@@ -62,6 +63,7 @@ type LearningNodeData = Record<string, unknown> & {
 type LearningNode = Node<LearningNodeData, "learning">;
 
 const mapUiStorageKey = "current-learning-map-ui-v2";
+const sourceAgentSessionKey = "current-source-agent-run-v1";
 const mapModeOrder: MapMode[] = ["map", "list", "updates", "notes"];
 const nodeTypes = { learning: LearningGraphNode } satisfies NodeTypes;
 
@@ -123,6 +125,7 @@ export function LearningMap({
   const [noteQuery, setNoteQuery] = useState("");
   const [removePathId, setRemovePathId] = useState<string | null>(null);
   const storageHydratedRef = useRef(false);
+  const sourceAgentStartedRef = useRef(false);
 
   const selectedPath = paths.find((path) => path.id === selectedPathId) ?? paths.find((path) => path.id === activePathId) ?? paths[0];
   const effectiveSuggestionStatus: SuggestionStatus = suggestedPathAdded ? "added" : suggestionStatus;
@@ -151,6 +154,11 @@ export function LearningMap({
     .filter((source): source is LearningSource & { href: string } => source.kind === "link" && typeof source.href === "string")
     .map((source) => ({ path, source }))), [paths]);
   const displayedUpdates = useMemo(() => [...sourceUpdates].reverse(), [sourceUpdates]);
+  const backgroundSource = useMemo(
+    () => selectBackgroundSource(paths, sourceUpdates, activePathId),
+    [activePathId, paths, sourceUpdates],
+  );
+  const agentChecking = sourceRefreshState?.status === "checking" && sourceRefreshState.trigger === "agent";
   const nodes = useMemo(
     () => createNodes(researchUpdateApplied || sourceUpdates.some((update) => update.status === "applied"), paths, activePathId, queue, compactGraph),
     [activePathId, compactGraph, paths, queue, researchUpdateApplied, sourceUpdates],
@@ -217,9 +225,9 @@ export function LearningMap({
     switchMapMode("map");
   };
 
-  const refreshSource = async (path: LearningPath, source: LearningSource & { href: string }) => {
+  const refreshSource = useCallback(async (path: LearningPath, source: LearningSource & { href: string }, trigger: "agent" | "manual" = "manual") => {
     const key = `${path.id}:${source.id}`;
-    setSourceRefreshState({ key, status: "checking" });
+    setSourceRefreshState({ key, status: "checking", trigger });
     try {
       const response = await fetch("/api/sources/refresh", {
         method: "POST",
@@ -242,16 +250,30 @@ export function LearningMap({
       if (!response.ok) throw new Error(result.error || "The source could not be checked.");
       if (result.changed && result.proposal) {
         onRecordSourceUpdate(result.proposal);
-        setReviewedUpdateId(result.proposal.id);
+        if (trigger === "manual") setReviewedUpdateId(result.proposal.id);
         setSourceRefreshState(null);
       } else if (result.latestSnapshot) {
         onSourceChecked(path.id, source.id, result.latestSnapshot);
-        setSourceRefreshState({ key, status: "unchanged", message: "No meaningful changes found." });
+        setSourceRefreshState({ key, status: "unchanged", trigger, message: "No meaningful changes found." });
       }
     } catch (error) {
-      setSourceRefreshState({ key, status: "error", message: error instanceof Error ? error.message : "The source could not be checked." });
+      setSourceRefreshState({ key, status: "error", trigger, message: error instanceof Error ? error.message : "The source could not be checked." });
     }
-  };
+  }, [onRecordSourceUpdate, onSourceChecked]);
+
+  useEffect(() => {
+    if (!backgroundSource || sourceAgentStartedRef.current) return;
+    try {
+      if (window.sessionStorage.getItem(sourceAgentSessionKey)) return;
+      window.sessionStorage.setItem(sourceAgentSessionKey, new Date().toISOString());
+    } catch {
+      // A tab-local ref still prevents duplicate checks when storage is unavailable.
+    }
+    sourceAgentStartedRef.current = true;
+    window.setTimeout(() => {
+      void refreshSource(backgroundSource.path, backgroundSource.source, "agent");
+    }, 0);
+  }, [backgroundSource, refreshSource]);
 
   const addCustomPath = (path: LearningPath) => {
     onAddCustomPath(path);
@@ -297,7 +319,7 @@ export function LearningMap({
           <section className="agent-updates-view map-view-enter" aria-label="Agent updates">
             <header className="agent-updates-header">
               <div><h1>Agent updates</h1><p>Source changes and path suggestions awaiting your decision.</p></div>
-              <span>{pendingUpdates ? `${pendingUpdates} pending` : "Up to date"}</span>
+              <span className={agentChecking ? "agent-checking" : ""}>{agentChecking ? <><RefreshCw className="spinning" size={11} /> Researching</> : pendingUpdates ? `${pendingUpdates} pending` : "Up to date"}</span>
             </header>
 
             <section className="source-watch-section" aria-label="Tracked sources">
@@ -310,8 +332,8 @@ export function LearningMap({
                   return (
                     <article className="source-watch-row" key={key}>
                       <span className="source-watch-icon"><Link2 size={14} /></span>
-                      <div><small>{path.title}</small><strong>{source.title}</strong><span>{state?.message ?? (hasPendingProposal ? "Change awaiting review" : source.snapshot ? `Snapshot from ${new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(source.snapshot.capturedAt))}` : "Ready for first check")}</span></div>
-                      <button disabled={state?.status === "checking" || hasPendingProposal} onClick={() => refreshSource(path, source)}>{state?.status === "checking" ? <RefreshCw className="spinning" size={13} /> : <RefreshCw size={13} />}<span>{state?.status === "checking" ? "Checking" : "Check"}</span></button>
+                      <div><small>{path.title}</small><strong>{source.title}</strong><span>{state?.message ?? (state?.status === "checking" && state.trigger === "agent" ? "Research agent checking" : hasPendingProposal ? "Change awaiting review" : source.snapshot ? `Snapshot from ${new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(source.snapshot.capturedAt))}` : "Ready for first check")}</span></div>
+                      <button disabled={sourceRefreshState?.status === "checking" || hasPendingProposal} onClick={() => refreshSource(path, source, "manual")}>{state?.status === "checking" ? <RefreshCw className="spinning" size={13} /> : <RefreshCw size={13} />}<span>{state?.status === "checking" ? "Checking" : "Check"}</span></button>
                     </article>
                   );
                 })}
