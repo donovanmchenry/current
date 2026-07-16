@@ -107,6 +107,10 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /className="concept-row"[\s\S]*onClick=\{\(\) => openLesson\(activePath\.id, index\)\}/);
   assert.match(workspace, /<GenericReadModule concept=\{activeConcept\}/);
   assert.match(workspace, /<GenericApplyModule[\s\S]*concept=\{activeConcept\}/);
+  assert.match(workspace, /fetch\("\/api\/lessons\/generate"/);
+  assert.match(workspace, /<DynamicApplyModule[\s\S]*application=\{activeLesson\.application\}/);
+  assert.match(workspace, /lesson=\{activeLesson\}/);
+  assert.doesNotMatch(workspace, /applicationAnswer\.trim\(\)\.length\s*>=\s*40/);
   assert.match(workspace, /activeSources\.map\(\(source\)/);
   assert.match(workspace, /setProgress[\s\S]*completedConceptIndexes[\s\S]*setReviews/s);
   assert.match(workspace, /nextIncompleteConcept\(activePath/);
@@ -245,6 +249,44 @@ test("keeps source-free fallback paths specific and progressive", async () => {
   assert.ok(path.concepts.every((concept) => concept.summary && concept.checkpoints?.length >= 2));
 });
 
+test("turns a created path concept into a complete lesson", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-lesson-api`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/api/lessons/generate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        pathTitle: "Urban water systems",
+        pathDescription: "Learn how resilient city water networks are planned.",
+        conceptIndex: 1,
+        concept: {
+          title: "Pressure zones",
+          objective: "Balance elevation and delivery pressure across a distribution network.",
+          summary: "Pressure zones keep service reliable across changing terrain.",
+          checkpoints: ["Elevation changes pressure", "Zones limit pressure ranges", "Pumps and storage stabilize delivery"],
+          sourceIds: ["water-notes"],
+          sourceNote: "Network elevation must be divided into pressure zones to avoid low service pressure and excessive pipe pressure.",
+        },
+        sources: [{ id: "water-notes", kind: "file", title: "Water planning notes", detail: "Uploaded notes" }],
+      }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  assert.equal(response.status, 200);
+  const lesson = await response.json();
+  assert.equal(lesson.mode, "demo");
+  assert.equal(lesson.application.type, "open_response");
+  assert.ok(lesson.reading.length >= 2);
+  assert.ok(lesson.recallRubric.length >= 2);
+  assert.ok(lesson.visualSteps.length >= 2);
+  assert.match(lesson.reading.join(" "), /pressure zones|elevation/i);
+  assert.deepEqual(lesson.sourceIds, ["water-notes"]);
+});
+
 test("returns a deterministic evaluation when no API key is configured", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-api`);
@@ -311,4 +353,31 @@ test("evaluates recall against a non-compaction concept rubric", async () => {
   const evaluation = await response.json();
   assert.ok(evaluation.score >= 75);
   assert.equal(evaluation.mode, "demo");
+});
+
+test("grades application by situation, choice, and reason", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-application-coach`);
+  const { default: worker } = await import(workerUrl.href);
+  const request = (answer) => worker.fetch(
+    new Request("http://localhost/api/coach", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        phase: "application",
+        concept: "Pressure zones",
+        objective: "Describe a situation where pressure zones change a network design choice.",
+        checkpoints: ["Elevation changes pressure", "Zones limit pressure ranges"],
+        answer,
+      }),
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  const vague = await (await request("Pressure zones involve elevation, pressure, networks, and pressure ranges." )).json();
+  const concrete = await (await request("When a city network crosses a steep elevation change, I would split it into pressure zones because the zones limit pressure ranges and keep delivery reliable.")).json();
+  assert.ok(vague.score < 75);
+  assert.ok(concrete.score >= 75);
+  assert.equal(concrete.mode, "demo");
 });

@@ -15,6 +15,7 @@ import {
   FolderOpen,
   Highlighter,
   ListChecks,
+  LoaderCircle,
   Menu,
   NotebookPen,
   Play,
@@ -24,7 +25,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { basePaths, suggestedPath } from "../lib/learning-catalog";
-import type { LearningConcept, LearningPath } from "../lib/learning-path";
+import type { GeneratedLesson, LearningConcept, LearningPath, LessonApplication } from "../lib/learning-path";
 import {
   defaultLearnerProfile,
   defaultProgress,
@@ -50,6 +51,12 @@ type Evaluation = {
   misconception: string | null;
   nextPrompt: string;
   mode: "live" | "demo";
+};
+
+type LessonGenerationState = {
+  key: string;
+  status: "loading" | "error";
+  message?: string;
 };
 
 const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
@@ -100,6 +107,10 @@ export function CurrentWorkspace() {
   const [applicationAnswer, setApplicationAnswer] = useState("");
   const [applicationChecked, setApplicationChecked] = useState(false);
   const [applicationPassed, setApplicationPassed] = useState(false);
+  const [applicationEvaluation, setApplicationEvaluation] = useState<Evaluation | null>(null);
+  const [isApplicationEvaluating, setIsApplicationEvaluating] = useState(false);
+  const [lessonGeneration, setLessonGeneration] = useState<LessonGenerationState | null>(null);
+  const [lessonRetryToken, setLessonRetryToken] = useState(0);
   const [lessonFinished, setLessonFinished] = useState(false);
   const [scheduledReviewAt, setScheduledReviewAt] = useState<string | null>(null);
   const [completionNextIndex, setCompletionNextIndex] = useState<number | null>(null);
@@ -109,6 +120,7 @@ export function CurrentWorkspace() {
   const [notebookOpen, setNotebookOpen] = useState(false);
   const hydrated = useRef(false);
   const lessonScrollRef = useRef<HTMLDivElement>(null);
+  const lessonRequestKey = useRef<string | null>(null);
 
   const rawPaths = useMemo(() => applyResearchRevision(
     [...basePaths, ...(suggestedPathAdded ? [suggestedPath] : []), ...customPaths],
@@ -124,6 +136,7 @@ export function CurrentWorkspace() {
   const activeProgress = progressForPath(activePath, progress[activePath.id]);
   const safeConceptIndex = Math.max(0, Math.min(activeConceptIndex, activePath.concepts.length - 1));
   const activeConcept = activePath.concepts[safeConceptIndex];
+  const activeLesson = activeConcept.lesson;
   const conceptKey = `${activePath.id}:${safeConceptIndex}`;
   const notes = notesByConcept[conceptKey] ?? "";
   const reflection = reflectionsByConcept[conceptKey] ?? "";
@@ -187,6 +200,39 @@ export function CurrentWorkspace() {
     window.localStorage.setItem(runtimeStorageKey, JSON.stringify(snapshot));
   }, [activePath.id, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, suggestedPathAdded]);
 
+  useEffect(() => {
+    if (workspaceView !== "lesson" || !activePath.userCreated || activeLesson) return;
+    const requestKey = `${activePath.id}:${safeConceptIndex}:${lessonRetryToken}`;
+    if (lessonRequestKey.current === requestKey) return;
+    lessonRequestKey.current = requestKey;
+    setLessonGeneration({ key: conceptKey, status: "loading" });
+
+    fetch("/api/lessons/generate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        pathTitle: activePath.title,
+        pathDescription: activePath.description,
+        concept: activeConcept,
+        conceptIndex: safeConceptIndex,
+        sources: activePath.sources ?? [],
+      }),
+    })
+      .then(async (response) => {
+        const result = await response.json() as GeneratedLesson & { error?: string };
+        if (!response.ok) throw new Error(result.error || "The lesson could not be generated.");
+        setCustomPaths((current) => current.map((path) => path.id !== activePath.id ? path : {
+          ...path,
+          concepts: path.concepts.map((concept, index) => index === safeConceptIndex ? { ...concept, lesson: result } : concept),
+        }));
+        setLessonGeneration(null);
+        lessonRequestKey.current = null;
+      })
+      .catch((error) => {
+        setLessonGeneration({ key: conceptKey, status: "error", message: error instanceof Error ? error.message : "The lesson could not be generated." });
+      });
+  }, [activeConcept, activeLesson, activePath.description, activePath.id, activePath.sources, activePath.title, activePath.userCreated, conceptKey, lessonRetryToken, safeConceptIndex, workspaceView]);
+
   const modeIndex = modeItems.findIndex((item) => item.id === mode);
   const recallComplete = recallPassed || lessonFinished;
   const codePassed = (isCompactionLesson ? codeChecked && codeChoice === 1 : applicationPassed) || lessonFinished;
@@ -243,8 +289,8 @@ export function CurrentWorkspace() {
         body: JSON.stringify({
           answer: recallAnswer,
           concept: activeConcept.title,
-          objective: activeConcept.objective,
-          checkpoints: activeConcept.checkpoints ?? [],
+          objective: activeLesson?.recallPrompt ?? activeConcept.objective,
+          checkpoints: activeLesson?.recallRubric ?? activeConcept.checkpoints ?? [],
         }),
       });
       if (!response.ok) throw new Error("Evaluation failed");
@@ -269,10 +315,48 @@ export function CurrentWorkspace() {
     setCodeChecked(true);
   };
 
-  const checkApplication = () => {
-    const passed = applicationAnswer.trim().length >= 40;
+  const checkApplication = async () => {
+    if (activeLesson?.application.type === "open_response") {
+      if (!applicationAnswer.trim()) return;
+      setIsApplicationEvaluating(true);
+      try {
+        const response = await fetch("/api/coach", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            answer: applicationAnswer,
+            concept: activeConcept.title,
+            objective: activeLesson.application.prompt,
+            checkpoints: activeLesson.application.rubric,
+            phase: "application",
+          }),
+        });
+        if (!response.ok) throw new Error("Application evaluation failed");
+        const result = await response.json() as Evaluation;
+        setApplicationEvaluation(result);
+        setApplicationPassed(result.score >= 75);
+      } catch {
+        const result = localEvaluation(applicationAnswer, { ...activeConcept, objective: activeLesson.application.prompt, checkpoints: activeLesson.application.rubric });
+        setApplicationEvaluation(result);
+        setApplicationPassed(result.score >= 75);
+      } finally {
+        setApplicationChecked(true);
+        setIsApplicationEvaluating(false);
+      }
+      return;
+    }
+
+    if (activeLesson) {
+      const passed = codeChoice === activeLesson.application.correctIndex;
+      setApplicationChecked(true);
+      setApplicationPassed(passed);
+      return;
+    }
+
+    const result = localEvaluation(applicationAnswer, activeConcept);
+    setApplicationEvaluation(result);
     setApplicationChecked(true);
-    setApplicationPassed(passed);
+    setApplicationPassed(result.score >= 75);
   };
 
   const finishAndSchedule = () => {
@@ -321,10 +405,18 @@ export function CurrentWorkspace() {
     setApplicationAnswer("");
     setApplicationChecked(false);
     setApplicationPassed(false);
+    setApplicationEvaluation(null);
+    setIsApplicationEvaluating(false);
     setLessonFinished(false);
     setScheduledReviewAt(null);
     setCompletionNextIndex(null);
     setActiveReviewId(null);
+  };
+
+  const retryLessonGeneration = () => {
+    lessonRequestKey.current = null;
+    setLessonGeneration(null);
+    setLessonRetryToken((current) => current + 1);
   };
 
   const openLesson = (pathId = activePath.id, conceptIndex = safeConceptIndex, nextMode: Mode = "read") => {
@@ -524,13 +616,16 @@ export function CurrentWorkspace() {
 
             <div className="lesson-scroll" ref={lessonScrollRef}>
               <div className="mode-stage">
-                {mode === "read" ? (isCompactionLesson
+                {activePath.userCreated && !activeLesson ? (
+                  <LessonGenerationModule state={lessonGeneration?.key === conceptKey ? lessonGeneration : null} retry={retryLessonGeneration} />
+                ) : mode === "read" ? (isCompactionLesson
                   ? <ReadModule concept={activeConcept} highlighted={highlighted} addToNotes={addExcerptToNotes} next={() => { setSupportMode("none"); transitionToMode("recall"); }} />
-                  : <GenericReadModule concept={activeConcept} path={activePath} addToNotes={addExcerptToNotes} next={() => transitionToMode("recall")} />) : null}
-                {mode === "recall" ? (
+                  : <GenericReadModule concept={activeConcept} path={activePath} lesson={activeLesson} addToNotes={addExcerptToNotes} next={() => transitionToMode("recall")} />) : null}
+                {(!activePath.userCreated || activeLesson) && mode === "recall" ? (
                   <RecallModule
                     concept={activeConcept}
                     compaction={isCompactionLesson}
+                    lesson={activeLesson}
                     answer={recallAnswer}
                     setAnswer={setRecallAnswer}
                     evaluation={evaluation}
@@ -545,12 +640,26 @@ export function CurrentWorkspace() {
                     next={() => transitionToMode("apply")}
                   />
                 ) : null}
-                {mode === "apply" ? (isCompactionLesson ? (
+                {(!activePath.userCreated || activeLesson) && mode === "apply" ? (isCompactionLesson ? (
                   <ApplyModule
                     choice={codeChoice}
                     setChoice={(choice) => { setCodeChoice(choice); setCodeChecked(false); }}
                     checked={codeChecked}
                     check={checkCode}
+                    next={() => transitionToMode("reflect")}
+                  />
+                ) : activeLesson ? (
+                  <DynamicApplyModule
+                    application={activeLesson.application}
+                    answer={applicationAnswer}
+                    setAnswer={(value) => { setApplicationAnswer(value); setApplicationChecked(false); setApplicationPassed(false); setApplicationEvaluation(null); }}
+                    choice={codeChoice}
+                    setChoice={(choice) => { setCodeChoice(choice); setApplicationChecked(false); setApplicationPassed(false); }}
+                    checked={applicationChecked}
+                    passed={applicationPassed}
+                    evaluation={applicationEvaluation}
+                    isEvaluating={isApplicationEvaluating}
+                    check={checkApplication}
                     next={() => transitionToMode("reflect")}
                   />
                 ) : (
@@ -564,9 +673,10 @@ export function CurrentWorkspace() {
                     next={() => transitionToMode("reflect")}
                   />
                 )) : null}
-                {mode === "reflect" ? (
+                {(!activePath.userCreated || activeLesson) && mode === "reflect" ? (
                   <ReflectModule
                     concept={activeConcept}
+                    prompt={activeLesson?.reflectionPrompt}
                     reflection={reflection}
                     setReflection={setReflection}
                     nextReview={scheduledReviewAt}
@@ -643,22 +753,38 @@ function isStoredReview(value: unknown): value is ReviewItem {
     && Boolean(review.memory && typeof review.memory.intervalDays === "number" && typeof review.memory.ease === "number" && typeof review.memory.repetitions === "number");
 }
 
-function GenericReadModule({ concept, path, addToNotes, next }: { concept: LearningConcept; path: LearningPath; addToNotes: () => void; next: () => void }) {
-  const checkpoints = concept.checkpoints?.length ? concept.checkpoints : [concept.objective];
+function LessonGenerationModule({ state, retry }: { state: LessonGenerationState | null; retry: () => void }) {
+  const failed = state?.status === "error";
+  return (
+    <article className="lesson-module lesson-generation-state" aria-live="polite">
+      <div className="lesson-generation-mark">{failed ? <CircleHelp size={20} /> : <LoaderCircle className="spinning" size={20} />}</div>
+      <h1>{failed ? "This lesson needs another pass." : "Building this lesson…"}</h1>
+      <p>{failed ? state.message : "Current is turning this path’s concepts and sources into a read, recall, apply, and reflect session."}</p>
+      {failed ? <button className="continue-button" onClick={retry}>Try again <RotateCcw size={14} /></button> : null}
+    </article>
+  );
+}
+
+function GenericReadModule({ concept, path, lesson, addToNotes, next }: { concept: LearningConcept; path: LearningPath; lesson?: GeneratedLesson; addToNotes: () => void; next: () => void }) {
+  const checkpoints = lesson?.keyPoints ?? (concept.checkpoints?.length ? concept.checkpoints : [concept.objective]);
   const conceptSources = (path.sources ?? []).filter((source) => concept.sourceIds === undefined || concept.sourceIds.includes(source.id));
   const primarySource = conceptSources.find((source) => source.href);
   return (
     <article className="lesson-module read-module">
       <header className="module-header">
-        <h1>{concept.title}</h1>
-        <p>{concept.summary ?? concept.objective}</p>
+        <h1>{lesson?.title ?? concept.title}</h1>
+        <p>{lesson?.overview ?? concept.summary ?? concept.objective}</p>
       </header>
+      {lesson ? <section className="reading-section generated-reading">
+        <h2>Build the mental model</h2>
+        {lesson.reading.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+      </section> : null}
       <section className="concept-overview-objective">
         <span>Learning objective</span>
         <p>{concept.objective}</p>
       </section>
       <section className="concept-overview-checkpoints">
-        <h2>Build the mental model</h2>
+        <h2>{lesson ? "Key relationships" : "Build the mental model"}</h2>
         <ol>
           {checkpoints.map((checkpoint, index) => <li key={checkpoint}><span>{index + 1}</span><strong>{checkpoint}</strong></li>)}
         </ol>
@@ -717,6 +843,7 @@ function ReadModule({ concept, highlighted, addToNotes, next }: { concept: Learn
 function RecallModule(props: {
   concept: LearningConcept;
   compaction: boolean;
+  lesson?: GeneratedLesson;
   answer: string;
   setAnswer: (value: string) => void;
   evaluation: Evaluation | null;
@@ -738,11 +865,11 @@ function RecallModule(props: {
     <article className="lesson-module recall-module">
       <header className="module-header compact-header">
         <h1>Rebuild the idea from memory.</h1>
-        <p>{props.compaction ? <>What triggers server-side compaction, what does it preserve, and what should the next request contain when using <code>previous_response_id</code>?</> : props.concept.objective}</p>
+        <p>{props.compaction ? <>What triggers server-side compaction, what does it preserve, and what should the next request contain when using <code>previous_response_id</code>?</> : props.lesson?.recallPrompt ?? props.concept.objective}</p>
       </header>
 
-      {props.supportMode === "visual" ? <VisualSupport concept={props.concept} compaction={props.compaction} /> : null}
-      {props.supportMode === "example" ? <ExampleSupport concept={props.concept} compaction={props.compaction} /> : null}
+      {props.supportMode === "visual" ? <VisualSupport concept={props.concept} compaction={props.compaction} steps={props.lesson?.visualSteps} /> : null}
+      {props.supportMode === "example" ? <ExampleSupport concept={props.concept} compaction={props.compaction} example={props.lesson?.example} /> : null}
 
       <label className="recall-input">
         <span>Your explanation</span>
@@ -781,13 +908,13 @@ function RecallModule(props: {
   );
 }
 
-function VisualSupport({ concept, compaction }: { concept: LearningConcept; compaction: boolean }) {
-  const steps = compaction ? ["Watch token count", "Cross threshold", "Emit compact item", "Send new turn"] : concept.checkpoints?.slice(0, 4) ?? [concept.objective];
+function VisualSupport({ concept, compaction, steps: lessonSteps }: { concept: LearningConcept; compaction: boolean; steps?: string[] }) {
+  const steps = compaction ? ["Watch token count", "Cross threshold", "Emit compact item", "Send new turn"] : lessonSteps?.slice(0, 4) ?? concept.checkpoints?.slice(0, 4) ?? [concept.objective];
   return <div className="support-module"><span className="support-label">Visual sequence</span><div className="support-steps">{steps.map((step, index) => <div className="support-step-wrap" key={step}>{index ? <ChevronRight size={16} /> : null}<div><small>{index + 1}</small><strong>{step}</strong></div></div>)}</div><p>{compaction ? <>The compact item carries forward the useful state. With <code>previous_response_id</code>, your application adds only the new user message.</> : concept.summary ?? concept.objective}</p></div>;
 }
 
-function ExampleSupport({ concept, compaction }: { concept: LearningConcept; compaction: boolean }) {
-  return <div className="support-module example-support"><span className="support-label">Concrete example</span><p>{compaction ? "Imagine a coding agent has completed 80 tool calls. The transcript crosses your token threshold. The server replaces older context with an opaque compact item, returns it in the stream, and continues. On the next turn, your app sends a new request with the previous response ID; it does not rebuild or prune the history itself." : `Imagine you need to use ${concept.title.toLowerCase()} in a real project. Start by identifying the decision described here: ${concept.objective}`}</p></div>;
+function ExampleSupport({ concept, compaction, example }: { concept: LearningConcept; compaction: boolean; example?: string }) {
+  return <div className="support-module example-support"><span className="support-label">Concrete example</span><p>{compaction ? "Imagine a coding agent has completed 80 tool calls. The transcript crosses your token threshold. The server replaces older context with an opaque compact item, returns it in the stream, and continues. On the next turn, your app sends a new request with the previous response ID; it does not rebuild or prune the history itself." : example ?? `Imagine you need to use ${concept.title.toLowerCase()} in a real project. Start by identifying the decision described here: ${concept.objective}`}</p></div>;
 }
 
 function ApplyModule({ choice, setChoice, checked, check, next }: { choice: number | null; setChoice: (choice: number) => void; checked: boolean; check: () => void; next: () => void }) {
@@ -831,13 +958,54 @@ function GenericApplyModule({ concept, answer, setAnswer, checked, passed, check
   );
 }
 
-function ReflectModule({ concept, reflection, setReflection, nextReview, schedule, finished, nextLabel, continueNext }: { concept: LearningConcept; reflection: string; setReflection: (value: string) => void; nextReview: string | null; schedule: () => void; finished: boolean; nextLabel: string; continueNext: () => void }) {
+function DynamicApplyModule({ application, answer, setAnswer, choice, setChoice, checked, passed, evaluation, isEvaluating, check, next }: { application: LessonApplication; answer: string; setAnswer: (value: string) => void; choice: number | null; setChoice: (choice: number) => void; checked: boolean; passed: boolean; evaluation: Evaluation | null; isEvaluating: boolean; check: () => void; next: () => void }) {
+  const openResponse = application.type === "open_response";
+  return (
+    <article className="lesson-module apply-module">
+      <header className="module-header compact-header">
+        <h1>Put the idea to work.</h1>
+        <p>{application.prompt}</p>
+      </header>
+      {openResponse ? (
+        <label className="recall-input application-input"><span>Your application</span><textarea value={answer} disabled={passed} onChange={(event) => setAnswer(event.target.value)} placeholder="Name the situation, your choice, and the reason…" /><small>{answer.trim().length} characters</small></label>
+      ) : (
+        <div className="practice-options" role="radiogroup" aria-label="Application choices">
+          {application.options.map((option, index) => (
+            <button
+              role="radio"
+              aria-checked={choice === index}
+              className={`${choice === index ? "selected" : ""} ${checked && choice === index && index !== application.correctIndex ? "wrong" : ""} ${checked && index === application.correctIndex ? "right" : ""}`}
+              onClick={() => !passed && setChoice(index)}
+              key={option}
+            >
+              <span className="option-index">{String.fromCharCode(65 + index)}</span>
+              <span>{option}</span>
+              {checked && index === application.correctIndex ? <CheckCircle2 size={17} /> : null}
+            </button>
+          ))}
+        </div>
+      )}
+      {checked ? (
+        <div className={passed ? "code-feedback success" : "code-feedback error"}>
+          {passed ? <CheckCircle2 size={16} /> : <CircleHelp size={16} />}
+          <p><strong>{passed ? "That applies the operating idea." : openResponse ? evaluation?.verdict ?? "Connect the decision to the concept." : "Reconsider what changes the decision."}</strong>{openResponse ? evaluation?.feedback ?? application.explanation : application.explanation}</p>
+        </div>
+      ) : null}
+      <footer className="module-footer">
+        <span>{openResponse ? "A strong answer makes the situation, choice, and reasoning visible." : "Choose the response that uses the concept, not one that repeats its wording."}</span>
+        {passed ? <button className="continue-button" onClick={next}>Reflect and schedule <ArrowRight size={15} /></button> : <button className="continue-button" disabled={openResponse ? !answer.trim() || isEvaluating : choice === null} onClick={check}>{isEvaluating ? "Checking…" : "Check application"}<Play size={13} /></button>}
+      </footer>
+    </article>
+  );
+}
+
+function ReflectModule({ concept, prompt, reflection, setReflection, nextReview, schedule, finished, nextLabel, continueNext }: { concept: LearningConcept; prompt?: string; reflection: string; setReflection: (value: string) => void; nextReview: string | null; schedule: () => void; finished: boolean; nextLabel: string; continueNext: () => void }) {
   const reviewDate = nextReview ? new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(nextReview)) : null;
   return (
     <article className="lesson-module reflect-module">
       <header className="module-header compact-header">
         <h1>Connect it to something you would build.</h1>
-        <p>What changed in your understanding of {concept.title.toLowerCase()}, and what would you watch for when using it?</p>
+        <p>{prompt ?? `What changed in your understanding of ${concept.title.toLowerCase()}, and what would you watch for when using it?`}</p>
       </header>
       <label className="recall-input reflection-input"><span>Your reflection</span><textarea value={reflection} onChange={(event) => setReflection(event.target.value)} placeholder="I would use this when…" /><small>Saved on this device.</small></label>
       <div className="session-summary">
