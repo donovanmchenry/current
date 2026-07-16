@@ -90,6 +90,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   const workspace = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
   const map = await readFile(new URL("../app/learning-map.tsx", import.meta.url), "utf8");
   const createPath = await readFile(new URL("../app/create-path-dialog.tsx", import.meta.url), "utf8");
+  const refreshSource = await readFile(new URL("../app/api/sources/refresh/route.ts", import.meta.url), "utf8");
   const runtime = await readFile(new URL("../lib/learning-runtime.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
@@ -97,8 +98,13 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /setWorkspaceView\("map"\)/);
   assert.match(workspace, /<LearningMap[\s\S]*paths=\{paths\}[\s\S]*queue=\{queue\}[\s\S]*onOpenLesson=\{openLesson\}/);
   assert.match(workspace, /onStartReview=\{startReview\}/);
-  assert.match(workspace, /onApplyResearchUpdate=\{applyResearchUpdate\}/);
-  assert.match(workspace, /setResearchUpdateApplied\(true\)/);
+  assert.match(workspace, /sourceUpdates=\{sourceUpdates\}/);
+  assert.match(workspace, /onRecordSourceUpdate=\{recordSourceUpdate\}/);
+  assert.match(workspace, /onSetSourceUpdateStatus=\{setSourceUpdateStatus\}/);
+  assert.match(workspace, /onSourceChecked=\{storeCheckedSource\}/);
+  assert.match(workspace, /setCheckedSources\(\(current\) =>/);
+  assert.match(workspace, /applyCheckedSources\(applyResearchRevision/);
+  assert.match(workspace, /reason: "research" as const/);
   assert.match(workspace, /const finishReview = \(\) =>/);
   assert.match(workspace, /scheduleReview\(existingReview\.memory, quality\)/);
   assert.match(workspace, /learnerProfile=\{learnerProfile\}/);
@@ -130,9 +136,12 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /graph-canvas map-surface/);
   assert.match(map, /learning-path-list map-surface/);
   assert.match(map, /aria-label="Search notes"/);
-  assert.match(map, /openUpdatedPath\("long-running", 1\)/);
-  assert.match(map, /setProposalStatus\("applied"\)/);
-  assert.match(map, /onApplyResearchUpdate\(\)/);
+  assert.match(map, /fetch\("\/api\/sources\/refresh"/);
+  assert.match(map, /aria-label="Tracked sources"/);
+  assert.match(map, /Review evidence/);
+  assert.match(map, /Apply update/);
+  assert.match(map, /className="source-delta"/);
+  assert.match(map, /onSetSourceUpdateStatus\(update\.id, "applied"\)/);
   assert.match(map, /setSuggestionStatus\("added"\)/);
   assert.match(map, /Set as next/);
   assert.match(map, /Remove from queue/);
@@ -141,6 +150,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.doesNotMatch(map, /map-return-button|Continue lesson/);
   assert.doesNotMatch(map, /const \[customPaths|const \[plannedPathId/);
   assert.doesNotMatch(map, /mapBodyRef|FitGraph version=\{`\$\{mapMode\}/);
+  assert.doesNotMatch(map, /effectiveProposalStatus/);
   assert.match(map, /setSelectedConceptIndex\(index\)/);
   assert.match(map, /aria-pressed=\{inspectedConceptIndex === index\}/);
   assert.match(map, /onOpenLesson\(selectedPath\.id, inspectedConceptIndex\)/);
@@ -153,7 +163,12 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(runtime, /export function nextIncompleteConcept/);
   assert.match(runtime, /export function pathWithProgress/);
   assert.match(runtime, /export type LearnerProfile/);
+  assert.match(runtime, /export function isStoredSourceUpdate/);
+  assert.match(runtime, /export function isStoredCheckedSource/);
   assert.match(createPath, /submittedLinks\.forEach\(\(link\) => form\.append\("links", link\)\)/);
+  assert.match(refreshSource, /model: "gpt-5\.6-sol"/);
+  assert.match(refreshSource, /reasoning: \{ effort: "high" \}/);
+  assert.match(refreshSource, /max_output_tokens: 4000/);
   assert.doesNotMatch(map, /Checking official sources|Running now|3 agents|Research active|id: "concept-/);
   assert.match(styles, /\.current-app\.map-view \.course-sidebar[^}]*display:\s*none/s);
   assert.match(styles, /\.concept-row[^}]*cursor:\s*pointer/s);
@@ -204,6 +219,10 @@ test("generates a source-derived learning path without an API key", async () => 
   assert.ok(path.concepts.every((concept) => concept.objective.length > 10));
   assert.ok(path.concepts.some((concept) => concept.sourceIds?.includes("file-0-water-notes.md")));
   assert.ok(path.concepts.some((concept) => concept.sourceNote?.length > 20));
+  assert.equal(path.sourceSnapshots.length, 1);
+  assert.equal(path.sourceSnapshots[0].sourceId, "file-0-water-notes.md");
+  assert.match(path.sourceSnapshots[0].snapshot.content, /Pressure zones/);
+  assert.match(path.sourceSnapshots[0].snapshot.fingerprint, /^[a-f0-9]{8}$/);
 });
 
 test("rejects private learning-path source URLs", async () => {

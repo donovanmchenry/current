@@ -160,9 +160,16 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
 
   const addToMap = () => {
     if (!generated) return;
+    const snapshots = new Map(generated.sourceSnapshots.map((entry) => [entry.sourceId, entry.snapshot]));
     const sourceRefs: LearningSource[] = [
-      ...links.map((link, index) => ({ id: `link-${index}-${link}`, kind: "link" as const, title: linkTitle(link), href: link, detail: "Web source" })),
-      ...files.map((file, index) => ({ id: `file-${index}-${file.name}`, kind: "file" as const, title: file.name, detail: formatFileSize(file.size) })),
+      ...links.map((link, index) => {
+        const id = `link-${index}-${link}`;
+        return { id, kind: "link" as const, title: linkTitle(link), href: link, detail: "Web source", snapshot: snapshots.get(id) };
+      }),
+      ...files.map((file, index) => {
+        const id = `file-${index}-${file.name}`;
+        return { id, kind: "file" as const, title: file.name, detail: formatFileSize(file.size), snapshot: snapshots.get(id) };
+      }),
     ];
     const id = `custom-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
     onCreate({

@@ -35,12 +35,43 @@ export type LearningConcept = {
   lesson?: GeneratedLesson;
 };
 
+export type SourceSnapshot = {
+  content: string;
+  capturedAt: string;
+  fingerprint: string;
+};
+
 export type LearningSource = {
   id: string;
   kind: "file" | "link";
   title: string;
   href?: string;
   detail?: string;
+  snapshot?: SourceSnapshot;
+};
+
+export type SourceConceptPatch = {
+  conceptIndex: number;
+  summary: string;
+  sourceNote: string;
+  checkpoints: string[];
+};
+
+export type SourceUpdateProposal = {
+  id: string;
+  pathId: string;
+  sourceId: string;
+  sourceTitle: string;
+  sourceHref: string;
+  detectedAt: string;
+  status: "ready" | "applied" | "dismissed";
+  summary: string;
+  beforeExcerpt: string;
+  afterExcerpt: string;
+  affectedConceptIndexes: number[];
+  patches: SourceConceptPatch[];
+  latestSnapshot: SourceSnapshot;
+  mode: "demo" | "live";
 };
 
 export type LearningPath = {
@@ -62,5 +93,6 @@ export type GeneratedLearningPath = {
   description: string;
   concepts: LearningConcept[];
   relatedPathId: string | null;
+  sourceSnapshots: Array<{ sourceId: string; snapshot: SourceSnapshot }>;
   mode: "demo" | "live";
 };

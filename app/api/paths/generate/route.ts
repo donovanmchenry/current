@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { GeneratedLearningPath, LearningConcept } from "@/lib/learning-path";
+import { createSourceSnapshot } from "@/lib/source-updates";
 
 const allowedTextExtensions = new Set(["csv", "json", "md", "txt"]);
 const blockedHeadings = new Set([
@@ -357,11 +358,15 @@ function demoPath(subject: string, goal: string, fetched: FetchedSource[], textF
     description: cleanText(goal).slice(0, 220),
     concepts,
     relatedPathId,
+    sourceSnapshots: [
+      ...fetched.map((source) => ({ sourceId: source.id, snapshot: createSourceSnapshot(source.text) })),
+      ...textFiles.map((source) => ({ sourceId: source.id, snapshot: createSourceSnapshot(source.text) })),
+    ],
     mode: "demo",
   };
 }
 
-function validateGeneratedPath(value: unknown): Omit<GeneratedLearningPath, "mode"> | null {
+function validateGeneratedPath(value: unknown): Omit<GeneratedLearningPath, "mode" | "sourceSnapshots"> | null {
   if (!value || typeof value !== "object") return null;
   const path = value as Partial<GeneratedLearningPath>;
   if (typeof path.title !== "string" || typeof path.description !== "string" || !Array.isArray(path.concepts)) return null;
@@ -406,6 +411,7 @@ export async function POST(request: Request) {
   const fetched = (await Promise.all(links.map((link, index) => fetchSource(link, linkSourceId(link, index))))).filter((source): source is FetchedSource => Boolean(source));
   const textFiles = (await Promise.all(files.map((file, index) => readTextFile(file, fileSourceId(file, index))))).filter((source): source is TextFileSource => Boolean(source));
   const fallback = demoPath(subject, goal, fetched, textFiles, files);
+  const sourceSnapshots = fallback.sourceSnapshots;
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return NextResponse.json(fallback);
 
@@ -485,7 +491,7 @@ export async function POST(request: Request) {
     if (!text) throw new Error("OpenAI response did not contain output text");
     const generated = validateGeneratedPath(JSON.parse(text));
     if (!generated) throw new Error("OpenAI response did not match the learning path contract");
-    return NextResponse.json({ ...generated, mode: "live" as const });
+    return NextResponse.json({ ...generated, sourceSnapshots, mode: "live" as const });
   } catch (error) {
     console.error("Live path generation failed; using deterministic fallback", error);
     return NextResponse.json(fallback);

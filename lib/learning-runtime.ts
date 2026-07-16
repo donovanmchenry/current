@@ -1,4 +1,4 @@
-import type { LearningPath } from "./learning-path";
+import type { LearningPath, SourceSnapshot, SourceUpdateProposal } from "./learning-path";
 import type { ReviewMemory } from "./spaced-review";
 
 export type PathProgress = {
@@ -25,8 +25,16 @@ export type LearningRuntimeSnapshot = {
   suggestedPathAdded: boolean;
   notes: Record<string, string>;
   reflections: Record<string, string>;
+  checkedSources?: CheckedSourceSnapshot[];
+  sourceUpdates?: SourceUpdateProposal[];
   researchUpdateApplied?: boolean;
   learnerProfile?: LearnerProfile;
+};
+
+export type CheckedSourceSnapshot = {
+  pathId: string;
+  sourceId: string;
+  snapshot: SourceSnapshot;
 };
 
 export type LearnerProfile = {
@@ -121,8 +129,32 @@ export function isStoredLearningPath(value: unknown): value is LearningPath {
     && (!concept.sourceNote || typeof concept.sourceNote === "string"))) return false;
   if (path.sources && (!Array.isArray(path.sources) || !path.sources.every((source) => {
     if (!source || typeof source.id !== "string" || typeof source.title !== "string" || (source.kind !== "file" && source.kind !== "link")) return false;
+    if (source.snapshot && (typeof source.snapshot.content !== "string" || typeof source.snapshot.capturedAt !== "string" || typeof source.snapshot.fingerprint !== "string")) return false;
     if (!source.href) return true;
     try { return new URL(source.href).protocol === "https:"; } catch { return false; }
   }))) return false;
   return true;
+}
+
+export function isStoredSourceUpdate(value: unknown): value is SourceUpdateProposal {
+  if (!value || typeof value !== "object") return false;
+  const update = value as Partial<SourceUpdateProposal>;
+  if (typeof update.id !== "string" || typeof update.pathId !== "string" || typeof update.sourceId !== "string" || typeof update.sourceTitle !== "string" || typeof update.sourceHref !== "string") return false;
+  if (!["ready", "applied", "dismissed"].includes(update.status ?? "") || typeof update.summary !== "string" || typeof update.beforeExcerpt !== "string" || typeof update.afterExcerpt !== "string") return false;
+  if (!Array.isArray(update.affectedConceptIndexes) || !update.affectedConceptIndexes.every((index) => Number.isInteger(index))) return false;
+  if (!Array.isArray(update.patches) || !update.patches.every((patch) => patch && Number.isInteger(patch.conceptIndex) && typeof patch.summary === "string" && typeof patch.sourceNote === "string" && Array.isArray(patch.checkpoints))) return false;
+  return Boolean(update.latestSnapshot && typeof update.latestSnapshot.content === "string" && typeof update.latestSnapshot.capturedAt === "string" && typeof update.latestSnapshot.fingerprint === "string");
+}
+
+export function isStoredCheckedSource(value: unknown): value is CheckedSourceSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const checked = value as Partial<CheckedSourceSnapshot>;
+  return Boolean(
+    typeof checked.pathId === "string"
+    && typeof checked.sourceId === "string"
+    && checked.snapshot
+    && typeof checked.snapshot.content === "string"
+    && typeof checked.snapshot.capturedAt === "string"
+    && typeof checked.snapshot.fingerprint === "string",
+  );
 }

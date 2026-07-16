@@ -25,15 +25,18 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { basePaths, suggestedPath } from "../lib/learning-catalog";
-import type { GeneratedLesson, LearningConcept, LearningPath, LessonApplication } from "../lib/learning-path";
+import type { GeneratedLesson, LearningConcept, LearningPath, LessonApplication, SourceSnapshot, SourceUpdateProposal } from "../lib/learning-path";
 import {
   defaultLearnerProfile,
   defaultProgress,
   defaultReviews,
+  isStoredCheckedSource,
   isStoredLearningPath,
+  isStoredSourceUpdate,
   nextIncompleteConcept,
   pathWithProgress,
   progressForPath,
+  type CheckedSourceSnapshot,
   type LearnerProfile,
   type LearningRuntimeSnapshot,
   type PathProgress,
@@ -83,6 +86,44 @@ function applyResearchRevision(paths: LearningPath[], applied: boolean) {
   });
 }
 
+function applySourceUpdates(paths: LearningPath[], updates: SourceUpdateProposal[]) {
+  return paths.map((path) => {
+    const pathUpdates = updates.filter((update) => update.pathId === path.id);
+    if (!pathUpdates.length) return path;
+    const resolvedUpdates = pathUpdates.filter((update) => update.status !== "ready");
+    const appliedUpdates = pathUpdates.filter((update) => update.status === "applied");
+    return {
+      ...path,
+      sources: path.sources?.map((source) => {
+        const latest = resolvedUpdates.filter((update) => update.sourceId === source.id).at(-1);
+        return latest ? { ...source, snapshot: latest.latestSnapshot } : source;
+      }),
+      concepts: path.concepts.map((concept, conceptIndex) => {
+        const patchUpdate = appliedUpdates.filter((update) => update.patches.some((patch) => patch.conceptIndex === conceptIndex)).at(-1);
+        const patch = patchUpdate?.patches.find((candidate) => candidate.conceptIndex === conceptIndex);
+        return patch ? {
+          ...concept,
+          summary: patch.summary,
+          sourceNote: patch.sourceNote,
+          checkpoints: patch.checkpoints,
+          updatedAt: patchUpdate.detectedAt,
+          lesson: undefined,
+        } : concept;
+      }),
+    };
+  });
+}
+
+function applyCheckedSources(paths: LearningPath[], checkedSources: CheckedSourceSnapshot[]) {
+  return paths.map((path) => ({
+    ...path,
+    sources: path.sources?.map((source) => {
+      const checked = checkedSources.filter((item) => item.pathId === path.id && item.sourceId === source.id).at(-1);
+      return checked ? { ...source, snapshot: checked.snapshot } : source;
+    }),
+  }));
+}
+
 export function CurrentWorkspace() {
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("lesson");
   const [customPaths, setCustomPaths] = useState<LearningPath[]>([]);
@@ -95,6 +136,8 @@ export function CurrentWorkspace() {
   const [notesByConcept, setNotesByConcept] = useState<Record<string, string>>({});
   const [reflectionsByConcept, setReflectionsByConcept] = useState<Record<string, string>>({});
   const [researchUpdateApplied, setResearchUpdateApplied] = useState(false);
+  const [checkedSources, setCheckedSources] = useState<CheckedSourceSnapshot[]>([]);
+  const [sourceUpdates, setSourceUpdates] = useState<SourceUpdateProposal[]>([]);
   const [learnerProfile, setLearnerProfile] = useState<LearnerProfile>(defaultLearnerProfile);
   const [mode, setMode] = useState<Mode>("read");
   const [recallAnswer, setRecallAnswer] = useState("");
@@ -122,10 +165,10 @@ export function CurrentWorkspace() {
   const lessonScrollRef = useRef<HTMLDivElement>(null);
   const lessonRequestKey = useRef<string | null>(null);
 
-  const rawPaths = useMemo(() => applyResearchRevision(
+  const rawPaths = useMemo(() => applySourceUpdates(applyCheckedSources(applyResearchRevision(
     [...basePaths, ...(suggestedPathAdded ? [suggestedPath] : []), ...customPaths],
     researchUpdateApplied,
-  ), [customPaths, researchUpdateApplied, suggestedPathAdded]);
+  ), checkedSources), sourceUpdates), [checkedSources, customPaths, researchUpdateApplied, sourceUpdates, suggestedPathAdded]);
   const paths = useMemo(() => rawPaths.map((path) => pathWithProgress(
     path,
     progress[path.id],
@@ -160,6 +203,8 @@ export function CurrentWorkspace() {
           if (Array.isArray(saved.reviews)) setReviews(saved.reviews.filter(isStoredReview));
           if (saved.notes && typeof saved.notes === "object") setNotesByConcept(sanitizeTextRecord(saved.notes));
           if (saved.reflections && typeof saved.reflections === "object") setReflectionsByConcept(sanitizeTextRecord(saved.reflections));
+          if (Array.isArray(saved.checkedSources)) setCheckedSources(saved.checkedSources.filter(isStoredCheckedSource).slice(-60));
+          if (Array.isArray(saved.sourceUpdates)) setSourceUpdates(saved.sourceUpdates.filter(isStoredSourceUpdate).slice(-30));
           setResearchUpdateApplied(Boolean(saved.researchUpdateApplied));
           if (saved.learnerProfile) setLearnerProfile(sanitizeLearnerProfile(saved.learnerProfile));
         } else {
@@ -194,11 +239,13 @@ export function CurrentWorkspace() {
       suggestedPathAdded,
       notes: notesByConcept,
       reflections: reflectionsByConcept,
+      checkedSources,
+      sourceUpdates,
       researchUpdateApplied,
       learnerProfile,
     };
     window.localStorage.setItem(runtimeStorageKey, JSON.stringify(snapshot));
-  }, [activePath.id, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, suggestedPathAdded]);
+  }, [activePath.id, checkedSources, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, sourceUpdates, suggestedPathAdded]);
 
   useEffect(() => {
     if (workspaceView !== "lesson" || !activePath.userCreated || activeLesson) return;
@@ -484,6 +531,8 @@ export function CurrentWorkspace() {
 
   const removeCustomPath = (pathId: string) => {
     setCustomPaths((current) => current.filter((path) => path.id !== pathId));
+    setCheckedSources((current) => current.filter((item) => item.pathId !== pathId));
+    setSourceUpdates((current) => current.filter((update) => update.pathId !== pathId));
     setQueue((current) => current.filter((item) => item !== pathId));
     setReviews((current) => current.filter((review) => review.pathId !== pathId));
     setProgress((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== pathId)));
@@ -498,17 +547,43 @@ export function CurrentWorkspace() {
     setProgress((current) => ({ ...current, [suggestedPath.id]: progressForPath(suggestedPath) }));
   };
 
-  const applyResearchUpdate = () => {
-    setResearchUpdateApplied(true);
-    const review: ReviewItem = {
-      id: "review-research-long-running-1",
-      pathId: "long-running",
-      conceptIndex: 1,
-      dueAt: new Date().toISOString(),
+  const recordSourceUpdate = (proposal: SourceUpdateProposal) => {
+    setSourceUpdates((current) => [...current.filter((update) => update.id !== proposal.id), proposal].slice(-30));
+  };
+
+  const setSourceUpdateStatus = (updateId: string, status: SourceUpdateProposal["status"]) => {
+    const proposal = sourceUpdates.find((update) => update.id === updateId);
+    if (!proposal) return;
+    setSourceUpdates((current) => current.map((update) => update.id === updateId ? { ...update, status } : update));
+    if (status !== "ready") {
+      setCheckedSources((current) => [...current.filter((item) => item.pathId !== proposal.pathId || item.sourceId !== proposal.sourceId), {
+        pathId: proposal.pathId,
+        sourceId: proposal.sourceId,
+        snapshot: proposal.latestSnapshot,
+      }].slice(-60));
+    }
+    if (status !== "applied") return;
+    const dueAt = new Date().toISOString();
+    const updateReviews = proposal.affectedConceptIndexes.map((conceptIndex) => ({
+      id: `review-research-${proposal.pathId}-${conceptIndex}-${proposal.latestSnapshot.fingerprint}`,
+      pathId: proposal.pathId,
+      conceptIndex,
+      dueAt,
       memory: { intervalDays: 1, ease: 2.5, repetitions: 0 },
-      reason: "research",
-    };
-    setReviews((current) => [...current.filter((item) => item.id !== review.id), review]);
+      reason: "research" as const,
+    }));
+    setReviews((current) => [
+      ...current.filter((review) => !updateReviews.some((candidate) => candidate.id === review.id)),
+      ...updateReviews,
+    ]);
+  };
+
+  const storeCheckedSource = (pathId: string, sourceId: string, snapshot: SourceSnapshot) => {
+    setCheckedSources((current) => [...current.filter((item) => item.pathId !== pathId || item.sourceId !== sourceId), {
+      pathId,
+      sourceId,
+      snapshot,
+    }].slice(-60));
   };
 
   return (
@@ -576,13 +651,16 @@ export function CurrentWorkspace() {
             learnerProfile={learnerProfile}
             suggestedPathAdded={suggestedPathAdded}
             researchUpdateApplied={researchUpdateApplied}
+            sourceUpdates={sourceUpdates}
             onOpenLesson={openLesson}
             onQueuePath={toggleQueue}
             onAddCustomPath={addCustomPath}
             onRemoveCustomPath={removeCustomPath}
             onAddSuggestedPath={addSuggestedPath}
             onStartReview={startReview}
-            onApplyResearchUpdate={applyResearchUpdate}
+            onRecordSourceUpdate={recordSourceUpdate}
+            onSetSourceUpdateStatus={setSourceUpdateStatus}
+            onSourceChecked={storeCheckedSource}
           />
         ) : (
           <>
