@@ -66,7 +66,7 @@ Current was designed and implemented in one continuous Codex task using GPT-5.6 
 - generate the source-backed lesson, interaction states, tests, metadata, and documentation;
 - run build, lint, rendered-output, and endpoint verification.
 
-The product decisions and the full architecture discussion are preserved in [`brainstorm.md`](./brainstorm.md). Build Week requirements are captured in [`details.md`](./details.md).
+The product decisions and the full architecture discussion are preserved in [`brainstorm.md`](./brainstorm.md). The phased product plan is tracked in [`ROADMAP.md`](./ROADMAP.md), and Build Week requirements are captured in [`details.md`](./details.md).
 
 ## Architecture
 
