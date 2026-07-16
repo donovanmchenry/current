@@ -150,10 +150,15 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /Set as next/);
   assert.match(map, /Remove from queue/);
   assert.match(map, /New path/);
+  assert.doesNotMatch(map, /map-toolbar-actions|create-path-button/);
   assert.match(map, /<CreatePathDialog/);
   assert.doesNotMatch(map, /map-return-button|Continue lesson/);
   assert.doesNotMatch(map, /const \[customPaths|const \[plannedPathId/);
   assert.doesNotMatch(map, /mapBodyRef|FitGraph version=\{`\$\{mapMode\}/);
+  assert.match(map, /const previousVersionRef = useRef\(version\)/);
+  assert.match(map, /previousVersionRef\.current === version/);
+  assert.match(map, /duration: 0/);
+  assert.doesNotMatch(map, /\n\s*refit\(\);\n\s*window\.addEventListener\("resize", refit\)/);
   assert.doesNotMatch(map, /effectiveProposalStatus/);
   assert.match(map, /setSelectedConceptIndex\(index\)/);
   assert.match(map, /aria-pressed=\{inspectedConceptIndex === index\}/);
@@ -161,6 +166,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(map, /inspectedConceptState === "current" && selectedPathIsActive \? "Continue" : "Start"/);
   assert.match(map, /className="review-queue"[\s\S]*onStartReview\(review\)/);
   const researchRail = map.match(/<aside className=\{`research-rail map-rail-enter[\s\S]*?<\/aside>/)?.[0] ?? "";
+  assert.match(researchRail, /selected-path-header[\s\S]*rail-create-path[\s\S]*New path/);
   assert.match(researchRail, /Review queue/);
   assert.doesNotMatch(researchRail, /Agent updates|agent-update-row|research-activity/);
   assert.match(runtime, /export const defaultReviews/);
@@ -179,6 +185,9 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(styles, /\.learning-map-shell[^}]*grid-template-columns:\s*minmax\(0, 1fr\) var\(--map-rail\)/s);
   assert.doesNotMatch(styles, /\.learning-map-shell\.updates-view|grid-template-columns \.36s/);
   assert.match(styles, /\.map-toolbar[^}]*grid-column:\s*1[^}]*grid-row:\s*1/s);
+  assert.doesNotMatch(styles, /\.map-toolbar-actions|\.create-path-button/);
+  assert.match(styles, /\.selected-path-header[^}]*justify-content:\s*space-between/s);
+  assert.match(styles, /\.rail-create-path[^}]*border-radius:\s*6px/s);
   assert.match(styles, /\.research-rail[^}]*grid-column:\s*2[^}]*grid-row:\s*1 \/ span 2/s);
   assert.match(styles, /\.map-view-switcher[^}]*grid-template-columns:\s*repeat\(4,/s);
   assert.match(styles, /\.map-view-switcher::before[^}]*transition:\s*transform \.36s cubic-bezier\(\.22, 1, \.36, 1\)/s);

@@ -308,9 +308,6 @@ export function LearningMap({
           <button role="tab" aria-label={pendingUpdates ? `Updates, ${pendingUpdates} pending` : "Updates"} aria-selected={mapMode === "updates"} className={[mapMode === "updates" ? "active" : "", pendingUpdates ? "updates-pending" : ""].filter(Boolean).join(" ")} onClick={() => switchMapMode("updates")}><Activity size={14} aria-hidden="true" /> Updates</button>
           <button role="tab" aria-selected={mapMode === "notes"} className={mapMode === "notes" ? "active" : ""} onClick={() => switchMapMode("notes")}><NotebookPen size={14} /> Notes{noteEntries.length ? <span className="updates-tab-count">{noteEntries.length}</span> : null}</button>
         </div>
-        <div className="map-toolbar-actions">
-          <button className="create-path-button" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={14} /><span>New path</span></button>
-        </div>
       </div>
 
       <div className={`learning-map-body map-transition-${mapTransitionDirection} ${fullViewActive ? "map-full-mode" : ""}`}>
@@ -443,7 +440,10 @@ export function LearningMap({
 
         <aside className={`research-rail map-rail-enter ${fullViewActive ? "workspace-hidden" : "workspace-active"}`}>
           <section className="selected-path-panel">
-            <span className="rail-label">Selected path</span>
+            <div className="selected-path-header">
+              <span className="rail-label">Selected path</span>
+              <button className="rail-create-path" aria-label="New path" onClick={() => setCreatePathOpen(true)}><Plus size={12} /><span>New path</span></button>
+            </div>
             <div className="selected-path-title"><FolderOpen size={16} /><div><strong>{selectedPath.title}</strong><small>{selectedPath.status}</small></div></div>
             <p>{selectedPath.description}</p>
             <div className="selected-path-progress"><span><i style={{ width: `${selectedPath.progress}%` }} /></span><small>{selectedPath.progress}% mastered</small></div>
@@ -520,23 +520,29 @@ export function LearningMap({
 
 function FitGraph({ version }: { version: string }) {
   const { fitView } = useReactFlow();
+  const previousVersionRef = useRef(version);
+
+  useEffect(() => {
+    if (previousVersionRef.current === version) return;
+    previousVersionRef.current = version;
+    void fitView({ padding: 0.15, maxZoom: 1.05, duration: 240 });
+  }, [fitView, version]);
 
   useEffect(() => {
     let frame = 0;
     const refit = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        void fitView({ padding: 0.15, maxZoom: 1.05, duration: 240 });
+        void fitView({ padding: 0.15, maxZoom: 1.05, duration: 0 });
       });
     };
 
-    refit();
     window.addEventListener("resize", refit);
     return () => {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", refit);
     };
-  }, [fitView, version]);
+  }, [fitView]);
 
   return null;
 }

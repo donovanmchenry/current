@@ -353,9 +353,6 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .map-view-switcher button > svg { flex: none; transition: color .22s ease; }
 .map-view-switcher button.updates-pending > svg { color: var(--accent-bright); }
 .updates-tab-count { min-width: 15px; height: 15px; display: grid; place-items: center; border-radius: 999px; padding: 0 4px; color: var(--accent-bright); background: hsl(var(--primary) / .14); font-size: 8px; line-height: 1; }
-.map-toolbar-actions { justify-self: end; display: flex; align-items: center; gap: 3px; }
-.create-path-button { min-height: 31px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 8px; padding: 0 10px; color: #111; background: #f2f2f2; font-size: 11px; font-weight: 560; cursor: pointer; }
-.create-path-button:hover { background: #dcdcdc; }
 .learning-map-body { position: relative; min-width: 0; min-height: 0; grid-column: 1 / -1; grid-row: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) var(--map-rail); grid-template-rows: 54px minmax(0, 1fr); }
 .map-full-view { position: relative; z-index: 10; min-width: 0; min-height: 0; grid-column: 1 / -1; grid-row: 2; overflow-y: auto; opacity: 0; visibility: hidden; pointer-events: none; background: #050505; transition: opacity .28s ease, visibility 0s linear .28s; }
 .map-full-view.active { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
@@ -476,6 +473,9 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .research-rail { position: relative; z-index: 11; min-width: 0; min-height: 0; grid-column: 2; grid-row: 1 / span 2; overflow-y: auto; padding: 22px 17px 32px; opacity: 1; visibility: visible; transform: translate3d(0, 0, 0); background: #090909; scrollbar-color: #444 transparent; will-change: opacity, transform; transition: opacity .24s ease, transform .32s cubic-bezier(.22, 1, .36, 1), visibility 0s linear 0s; }
 .research-rail.workspace-hidden { opacity: 0; visibility: hidden; transform: translate3d(16px, 0, 0); pointer-events: none; transition: opacity .24s ease, transform .32s cubic-bezier(.22, 1, .36, 1), visibility 0s linear .32s; }
 .rail-label { display: block; color: var(--text-muted); font-size: 10px; }
+.selected-path-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rail-create-path { min-height: 26px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 6px; padding: 0 7px; color: var(--text-secondary); background: #202020; font-size: 9px; cursor: pointer; }
+.rail-create-path:hover { color: var(--text); background: #292929; }
 .selected-path-title { display: grid; grid-template-columns: 20px 1fr; align-items: start; gap: 8px; margin-top: 10px; }
 .selected-path-title > svg { margin-top: 1px; color: var(--text-muted); }
 .selected-path-title strong, .selected-path-title small { display: block; }
@@ -668,14 +668,11 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
   .notebook-overlay { left: 0; }
   .lesson-toolbar { grid-template-columns: auto 1fr auto; padding-inline: 9px; }
   .learning-map-shell { display: flex; flex-direction: column; }
-  .map-toolbar { flex: 0 0 92px; grid-template-columns: minmax(0, 1fr) 30px; grid-template-rows: 38px 38px; gap: 3px 8px; padding: 6px 9px 7px; }
+  .map-toolbar { flex: 0 0 92px; grid-template-columns: minmax(0, 1fr); grid-template-rows: 38px 38px; gap: 3px; padding: 6px 9px 7px; }
   .map-toolbar-start { grid-column: 1; grid-row: 1; }
   .map-wordmark { gap: 7px; }
   .map-wordmark strong { display: block; font-size: 13px; }
   .map-toolbar-divider, .map-toolbar-title { display: none; }
-  .map-toolbar-actions { grid-column: 2; grid-row: 1; }
-  .create-path-button { width: 30px; height: 30px; padding: 0; justify-content: center; }
-  .create-path-button span { display: none; }
   .map-view-switcher { width: 100%; grid-column: 1 / -1; grid-row: 2; }
   .map-view-switcher button { min-width: 0; padding-inline: 6px; gap: 4px; }
   .map-view-switcher button > svg { display: none; }
