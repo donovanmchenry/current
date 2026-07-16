@@ -520,7 +520,7 @@ export function CurrentWorkspace() {
         <div className="sidebar-brand">
           <span className="sidebar-wordmark">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/current-icon.svg" width="20" height="20" alt="" aria-hidden="true" />
+            <img src="/current-icon.png" width="20" height="20" alt="" aria-hidden="true" />
             Current
           </span>
           <button className="icon-action mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button>

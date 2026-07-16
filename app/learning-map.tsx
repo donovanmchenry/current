@@ -239,7 +239,7 @@ export function LearningMap({
         <div className="map-toolbar-start">
           <span className="map-wordmark">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/current-icon.svg" width="18" height="18" alt="" aria-hidden="true" />
+            <img src="/current-icon.png" width="18" height="18" alt="" aria-hidden="true" />
             <strong>Current</strong>
           </span>
           <span className="map-toolbar-divider" aria-hidden="true" />

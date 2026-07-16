@@ -21,7 +21,7 @@ test("server-renders the Current product shell", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Current · Keep your knowledge current<\/title>/i);
-  assert.match(html, /<link[^>]+rel="icon"[^>]+href="[^"]*\/current-icon\.svg"[^>]*>/i);
+  assert.match(html, /<link[^>]+rel="icon"[^>]+href="[^"]*\/current-icon\.png"[^>]*>/i);
   assert.match(html, /Long-running agents/);
   assert.match(html, /What compaction actually preserves/);
   assert.match(html, /Recall/);
@@ -37,7 +37,7 @@ test("keeps sources in the course sidebar and the notebook notes-only", async ()
 
   assert.match(source, /sidebar-sources-viewport \$\{sourcesOpen \? "open"/);
   assert.match(source, /course-sidebar[\s\S]*sidebar-brand[\s\S]*Current/);
-  assert.match(source, /sidebar-wordmark[\s\S]*src="\/current-icon\.svg"/);
+  assert.match(source, /sidebar-wordmark[\s\S]*src="\/current-icon\.png"/);
   assert.doesNotMatch(source, /workspace-header|AI agent engineering|Long-running agent context|Concept 2 of 5/);
   assert.match(source, /aria-pressed=\{notebookOpen\}/);
   assert.match(source, /notebook-panel \$\{notebookOpen \? "open".*aria-hidden=\{!notebookOpen\}/s);
