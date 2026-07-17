@@ -58,6 +58,8 @@ The lesson cites the official [compaction](https://developers.openai.com/api/doc
 
 Recall results are stored by concept rather than only as a global score. When an answer misses a relationship, Current preserves the evaluator's specific misconception, marks that concept as needing attention on the Learning Map, and shows the gap beside the next lesson action. A successful retry clears the gap and remembers whether a visual sequence or concrete example helped; answers that required retries receive a shorter spaced-review interval than clean first-pass recall.
 
+Uploaded source files are retained in device-local browser storage after path generation. Original text material and PDFs can be reopened in Current through the source viewer and download action; extracted text remains available as a fallback if the browser artifact is lost. Removing a custom path also removes its stored file artifacts.
+
 ## Codex build story
 
 Current was designed and implemented in one continuous Codex task using GPT-5.6 Sol with high reasoning effort. Codex helped:
@@ -78,6 +80,7 @@ The product decisions and the full architecture discussion are preserved in [`br
 - `app/learning-map.tsx`: path navigation, concept memory, review queue, and research updates
 - `app/api/coach/route.ts`: GPT-5.6 Sol recall evaluation with deterministic fallback
 - `lib/learning-runtime.ts`: persisted path progress, misconception memory, and review quality
+- `lib/source-artifacts.ts`: device-local storage for reopenable uploaded sources
 - `lib/spaced-review.ts`: SM-2-inspired review scheduling
 - `tests/`: rendered product, endpoint, and scheduler verification
 - `.openai/hosting.json`: OpenAI Sites deployment configuration

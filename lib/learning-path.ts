@@ -48,6 +48,7 @@ export type LearningSource = {
   href?: string;
   detail?: string;
   snapshot?: SourceSnapshot;
+  artifactId?: string;
 };
 
 export type SourceConceptPatch = {

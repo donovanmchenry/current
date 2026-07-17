@@ -4,6 +4,7 @@ import { ArrowLeft, Check, FileText, Link2, LoaderCircle, Paperclip, Plus, Trash
 import { useEffect, useRef, useState } from "react";
 
 import type { GeneratedLearningPath, LearningPath, LearningSource } from "@/lib/learning-path";
+import { storeSourceArtifacts } from "@/lib/source-artifacts";
 
 type CreatePathDialogProps = {
   open: boolean;
@@ -45,6 +46,7 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
   const [generated, setGenerated] = useState<GeneratedLearningPath | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const subjectRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,14 +54,14 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
     if (!open) return;
     const frame = window.requestAnimationFrame(() => subjectRef.current?.focus());
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isGenerating) onClose();
+      if (event.key === "Escape" && !isGenerating && !isSaving) onClose();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [isGenerating, onClose, open]);
+  }, [isGenerating, isSaving, onClose, open]);
 
   if (!open) return null;
 
@@ -158,20 +160,33 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
     }
   };
 
-  const addToMap = () => {
+  const addToMap = async () => {
     if (!generated) return;
     const snapshots = new Map(generated.sourceSnapshots.map((entry) => [entry.sourceId, entry.snapshot]));
+    const id = `custom-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
+    const fileArtifacts = files.map((file, index) => ({
+      id: `${id}:file-${index}-${file.name}`,
+      file,
+    }));
+    setIsSaving(true);
+    setError(null);
+    try {
+      await storeSourceArtifacts(fileArtifacts);
+    } catch (storageError) {
+      setError(storageError instanceof Error ? storageError.message : "The attached files could not be saved on this device.");
+      setIsSaving(false);
+      return;
+    }
     const sourceRefs: LearningSource[] = [
       ...links.map((link, index) => {
         const id = `link-${index}-${link}`;
         return { id, kind: "link" as const, title: linkTitle(link), href: link, detail: "Web source", snapshot: snapshots.get(id) };
       }),
       ...files.map((file, index) => {
-        const id = `file-${index}-${file.name}`;
-        return { id, kind: "file" as const, title: file.name, detail: formatFileSize(file.size), snapshot: snapshots.get(id) };
+        const sourceId = `file-${index}-${file.name}`;
+        return { id: sourceId, kind: "file" as const, title: file.name, detail: formatFileSize(file.size), snapshot: snapshots.get(sourceId), artifactId: `${id}:${sourceId}` };
       }),
     ];
-    const id = `custom-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
     onCreate({
       id,
       title: generated.title,
@@ -192,17 +207,18 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
     setFiles([]);
     setGenerated(null);
     setError(null);
+    setIsSaving(false);
   };
 
   return (
-    <div className="create-path-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !isGenerating) onClose(); }}>
+    <div className="create-path-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !isGenerating && !isSaving) onClose(); }}>
       <section className="create-path-dialog" role="dialog" aria-modal="true" aria-labelledby="create-path-title">
         <header className="create-path-header">
           <div>
             <span className="create-path-icon"><Plus size={15} /></span>
             <h2 id="create-path-title">Create learning path</h2>
           </div>
-          <button className="icon-action" aria-label="Close new path" onClick={onClose} disabled={isGenerating}><X size={17} /></button>
+          <button className="icon-action" aria-label="Close new path" onClick={onClose} disabled={isGenerating || isSaving}><X size={17} /></button>
         </header>
 
         {generated ? (
@@ -222,8 +238,8 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
             </ol>
             <div className="path-preview-sources"><Paperclip size={13} /><span>{links.length + files.length || "No"} source{links.length + files.length === 1 ? "" : "s"}</span></div>
             <footer className="create-path-footer">
-              <button type="button" className="secondary-path-action" onClick={() => setGenerated(null)}><ArrowLeft size={14} /> Edit inputs</button>
-              <button type="button" className="primary-path-action" onClick={addToMap}><Check size={14} /> Add to map</button>
+              <button type="button" className="secondary-path-action" onClick={() => setGenerated(null)} disabled={isSaving}><ArrowLeft size={14} /> Edit inputs</button>
+              <button type="button" className="primary-path-action" onClick={addToMap} disabled={isSaving}>{isSaving ? <LoaderCircle className="create-path-spinner" size={14} /> : <Check size={14} />} {isSaving ? "Saving files" : "Add to map"}</button>
             </footer>
           </div>
         ) : (

@@ -90,6 +90,8 @@ test("connects the lesson shell to a functional learning map", async () => {
   const workspace = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
   const map = await readFile(new URL("../app/learning-map.tsx", import.meta.url), "utf8");
   const createPath = await readFile(new URL("../app/create-path-dialog.tsx", import.meta.url), "utf8");
+  const sourceArtifactDialog = await readFile(new URL("../app/source-artifact-dialog.tsx", import.meta.url), "utf8");
+  const sourceArtifacts = await readFile(new URL("../lib/source-artifacts.ts", import.meta.url), "utf8");
   const refreshSource = await readFile(new URL("../app/api/sources/refresh/route.ts", import.meta.url), "utf8");
   const runtime = await readFile(new URL("../lib/learning-runtime.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
@@ -102,6 +104,9 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(workspace, /onRecordSourceUpdate=\{recordSourceUpdate\}/);
   assert.match(workspace, /onSetSourceUpdateStatus=\{setSourceUpdateStatus\}/);
   assert.match(workspace, /onSourceChecked=\{storeCheckedSource\}/);
+  assert.match(workspace, /onOpenSource=\{setActiveArtifactSource\}/);
+  assert.match(workspace, /<SourceArtifactDialog key=\{activeArtifactSource[\s\S]*source=\{activeArtifactSource\}/);
+  assert.match(workspace, /removeSourceArtifacts/);
   assert.match(workspace, /setCheckedSources\(\(current\) =>/);
   assert.match(workspace, /applyCheckedSources\(applyResearchRevision/);
   assert.match(workspace, /reason: "research" as const/);
@@ -184,6 +189,13 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(runtime, /export function isStoredSourceUpdate/);
   assert.match(runtime, /export function isStoredCheckedSource/);
   assert.match(createPath, /submittedLinks\.forEach\(\(link\) => form\.append\("links", link\)\)/);
+  assert.match(createPath, /await storeSourceArtifacts\(fileArtifacts\)/);
+  assert.match(createPath, /artifactId: `\$\{id\}:\$\{sourceId\}`/);
+  assert.match(sourceArtifacts, /indexedDB\.open\(databaseName, 1\)/);
+  assert.match(sourceArtifacts, /store\.put\(/);
+  assert.match(sourceArtifactDialog, /readSourceArtifact\(source\.artifactId\)/);
+  assert.match(sourceArtifactDialog, /<iframe src=\{objectUrl\}/);
+  assert.match(sourceArtifactDialog, /download=\{source\.title\}/);
   assert.match(refreshSource, /model: "gpt-5\.6-sol"/);
   assert.match(refreshSource, /reasoning: \{ effort: "high" \}/);
   assert.match(refreshSource, /max_output_tokens: 8000/);
@@ -212,6 +224,7 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(styles, /\.learning-graph-node[^}]*border-radius:\s*8px/s);
   assert.match(styles, /\.review-queue-item[^}]*cursor:\s*pointer/s);
   assert.match(styles, /\.selected-concept-memory[^}]*border-radius:\s*6px[^}]*background:\s*#141414/s);
+  assert.match(styles, /\.source-artifact-dialog[^}]*width:\s*min\(900px,[^}]*grid-template-rows:\s*58px minmax\(0, 1fr\) 43px/s);
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.learning-map-body[^}]*display:\s*block[^}]*overflow-y:\s*auto/s);
 });
 

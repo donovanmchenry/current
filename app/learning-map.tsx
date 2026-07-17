@@ -88,6 +88,7 @@ type LearningMapProps = {
   onRecordSourceUpdate: (proposal: SourceUpdateProposal) => void;
   onSetSourceUpdateStatus: (updateId: string, status: SourceUpdateProposal["status"]) => void;
   onSourceChecked: (pathId: string, sourceId: string, snapshot: SourceSnapshot) => void;
+  onOpenSource: (source: LearningSource) => void;
 };
 
 export function LearningMap({
@@ -111,6 +112,7 @@ export function LearningMap({
   onRecordSourceUpdate,
   onSetSourceUpdateStatus,
   onSourceChecked,
+  onOpenSource,
 }: LearningMapProps) {
   const [mapMode, setMapMode] = useState<MapMode>("map");
   const [mapTransitionDirection, setMapTransitionDirection] = useState<MapTransitionDirection>("forward");
@@ -487,7 +489,7 @@ export function LearningMap({
                   {inspectedSources.map((source) => (
                     <li key={source.id}>
                       {source.kind === "link" ? <Link2 size={12} /> : <FileText size={12} />}
-                      {source.href ? <a href={source.href} target="_blank" rel="noreferrer"><strong>{source.title}</strong><small>{source.detail}</small></a> : <div><strong>{source.title}</strong><small>{source.detail}</small></div>}
+                      {source.href ? <a href={source.href} target="_blank" rel="noreferrer"><strong>{source.title}</strong><small>{source.detail}</small></a> : source.kind === "file" ? <button type="button" onClick={() => onOpenSource(source)}><strong>{source.title}</strong><small>{source.detail}</small></button> : <div><strong>{source.title}</strong><small>{source.detail}</small></div>}
                     </li>
                   ))}
                 </ul>

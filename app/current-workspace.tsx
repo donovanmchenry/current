@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { basePaths, suggestedPath } from "../lib/learning-catalog";
-import type { GeneratedLesson, LearningConcept, LearningPath, LessonApplication, SourceSnapshot, SourceUpdateProposal } from "../lib/learning-path";
+import type { GeneratedLesson, LearningConcept, LearningPath, LearningSource, LessonApplication, SourceSnapshot, SourceUpdateProposal } from "../lib/learning-path";
 import {
   defaultLearnerProfile,
   defaultProgress,
@@ -46,7 +46,9 @@ import {
   type ReviewItem,
 } from "../lib/learning-runtime";
 import { scheduleReview } from "../lib/spaced-review";
+import { removeSourceArtifacts } from "../lib/source-artifacts";
 import { LearningMap } from "./learning-map";
+import { SourceArtifactDialog } from "./source-artifact-dialog";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
 type WorkspaceView = "lesson" | "map";
@@ -166,6 +168,7 @@ export function CurrentWorkspace() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [notebookOpen, setNotebookOpen] = useState(false);
+  const [activeArtifactSource, setActiveArtifactSource] = useState<LearningSource | null>(null);
   const hydrated = useRef(false);
   const lessonScrollRef = useRef<HTMLDivElement>(null);
   const lessonRequestKey = useRef<string | null>(null);
@@ -549,6 +552,8 @@ export function CurrentWorkspace() {
   };
 
   const removeCustomPath = (pathId: string) => {
+    const removedPath = customPaths.find((path) => path.id === pathId);
+    void removeSourceArtifacts((removedPath?.sources ?? []).flatMap((source) => source.artifactId ? [source.artifactId] : []));
     setCustomPaths((current) => current.filter((path) => path.id !== pathId));
     setCheckedSources((current) => current.filter((item) => item.pathId !== pathId));
     setSourceUpdates((current) => current.filter((update) => update.pathId !== pathId));
@@ -556,6 +561,7 @@ export function CurrentWorkspace() {
     setReviews((current) => current.filter((review) => review.pathId !== pathId));
     setProgress((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== pathId)));
     setConceptMemories((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${pathId}:`))));
+    if (activeArtifactSource && removedPath?.sources?.some((source) => source.id === activeArtifactSource.id)) setActiveArtifactSource(null);
     if (activePath.id === pathId) {
       setActivePathId("long-running");
       setActiveConceptIndex(1);
@@ -649,6 +655,10 @@ export function CurrentWorkspace() {
                   <a href={source.href} target="_blank" rel="noreferrer" tabIndex={sourcesOpen ? 0 : -1} className="sidebar-source-item" key={source.id}>
                     <FileText size={14} /><span><strong>{source.title}</strong><small>{source.detail}</small></span><ExternalLink size={12} />
                   </a>
+                ) : source.kind === "file" ? (
+                  <button type="button" tabIndex={sourcesOpen ? 0 : -1} className="sidebar-source-item" onClick={() => setActiveArtifactSource(source)} key={source.id}>
+                    <FileText size={14} /><span><strong>{source.title}</strong><small>{source.detail}</small></span><ChevronRight size={12} />
+                  </button>
                 ) : (
                   <div className="sidebar-source-item" key={source.id}><FileText size={14} /><span><strong>{source.title}</strong><small>{source.detail}</small></span></div>
                 ))}
@@ -682,6 +692,7 @@ export function CurrentWorkspace() {
             onRecordSourceUpdate={recordSourceUpdate}
             onSetSourceUpdateStatus={setSourceUpdateStatus}
             onSourceChecked={storeCheckedSource}
+            onOpenSource={setActiveArtifactSource}
           />
         ) : (
           <>
@@ -809,6 +820,7 @@ export function CurrentWorkspace() {
           </div>
         </div>
       </aside>
+      <SourceArtifactDialog key={activeArtifactSource?.artifactId ?? activeArtifactSource?.id ?? "closed"} source={activeArtifactSource} onClose={() => setActiveArtifactSource(null)} />
     </div>
   );
 }

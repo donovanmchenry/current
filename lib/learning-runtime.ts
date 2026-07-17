@@ -164,6 +164,7 @@ export function isStoredLearningPath(value: unknown): value is LearningPath {
   if (path.sources && (!Array.isArray(path.sources) || !path.sources.every((source) => {
     if (!source || typeof source.id !== "string" || typeof source.title !== "string" || (source.kind !== "file" && source.kind !== "link")) return false;
     if (source.snapshot && (typeof source.snapshot.content !== "string" || typeof source.snapshot.capturedAt !== "string" || typeof source.snapshot.fingerprint !== "string")) return false;
+    if (source.artifactId !== undefined && (typeof source.artifactId !== "string" || !source.artifactId)) return false;
     if (!source.href) return true;
     try { return new URL(source.href).protocol === "https:"; } catch { return false; }
   }))) return false;
