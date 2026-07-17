@@ -58,6 +58,23 @@ Path previews, generated lessons, recall evaluations, and source-update proposal
 
 The lesson cites the official [compaction](https://developers.openai.com/api/docs/guides/compaction) and [conversation state](https://developers.openai.com/api/docs/guides/conversation-state) guides.
 
+## Learning science
+
+Current is an evidence-informed prototype, not a validated learning intervention. The research below motivates specific product decisions; measuring whether Current improves durable learning is a separate evaluation step.
+
+| Method | Evidence | Current interaction |
+| --- | --- | --- |
+| Retrieval practice | [Roediger and Karpicke (2006)](https://doi.org/10.1111/j.1467-9280.2006.01693.x) found that retrieval testing improved delayed retention compared with repeated study. | Recall hides the source and asks the learner to reconstruct the concept in their own words. |
+| Corrective feedback | [Butler, Karpicke, and Roediger (2007)](https://doi.org/10.1037/1076-898X.13.4.273) found that feedback containing the correct response improved later recall from multiple-choice tests. | The evaluator identifies the missing conceptual relationship and supports a retry instead of returning only a score. |
+| Spaced practice | [Cepeda et al. (2006)](https://doi.org/10.1037/0033-2909.132.3.354) synthesized 317 experiments and found a robust spacing effect whose useful interval depends on the desired retention period. | Completing a lesson schedules a future review; concepts that required retries return sooner than clean first-pass recalls. |
+| Interleaving | [Rohrer and Taylor (2007)](https://doi.org/10.1007/s11251-007-9015-8) found that shuffled mathematics practice improved delayed test performance. | The review queue can mix due concepts from different paths instead of keeping every session blocked by topic. |
+| Self-explanation | [Chi et al. (1989)](https://doi.org/10.1207/s15516709cog1302_1) connected learners' spontaneous explanations of worked examples with stronger understanding. | Reflect asks the learner to explain where the idea belongs in their own work after applying it. |
+| Worked examples | [Sweller and Cooper (1985)](https://doi.org/10.1207/s1532690xci0201_3) showed benefits from worked examples during early algebra schema acquisition. | A learner who struggles can switch from an abstract explanation to a concrete example or visual sequence before retrying. |
+| Mastery before progression | [Kulik, Kulik, and Bangert-Drowns (1990)](https://doi.org/10.3102/00346543060002265) reported positive achievement effects across 108 controlled evaluations of mastery-learning programs, with tradeoffs including more time on task. | Apply unlocks after successful Recall, and Reflect unlocks after successful Apply; Current does not treat exposure as mastery. |
+| Personal relevance | [Hulleman and Harackiewicz (2009)](https://doi.org/10.1126/science.1177067) found that connecting science material to students' lives increased interest and performance, especially for students with low success expectations. | New paths begin with the learner's subject, goal, and chosen sources. Deeper interest-based personalization remains on the roadmap. |
+
+Current deliberately does not classify learners as visual, auditory, or kinesthetic types. [Pashler et al. (2008)](https://doi.org/10.1111/j.1539-6053.2009.01038.x) found inadequate evidence for matching instruction to fixed learning-style categories. Visual sequences, concrete examples, and other supports are selectable strategies that Current can adapt from observed outcomes and learner choice, not identity labels.
+
 ## Adaptive concept memory
 
 Recall results are stored by concept rather than only as a global score. When an answer misses a relationship, Current preserves the evaluator's specific misconception, marks that concept as needing attention on the Learning Map, and shows the gap beside the next lesson action. A successful retry clears the gap and remembers whether a visual sequence or concrete example helped; answers that required retries receive a shorter spaced-review interval than clean first-pass recall.
@@ -76,7 +93,7 @@ Current was designed and implemented in one continuous Codex task using GPT-5.6 
 - generate the source-backed lesson, interaction states, tests, metadata, and documentation;
 - run build, lint, rendered-output, and endpoint verification.
 
-The product decisions and the full architecture discussion are preserved in [`brainstorm.md`](./brainstorm.md). The phased product plan is tracked in [`ROADMAP.md`](./ROADMAP.md), and Build Week requirements are captured in [`details.md`](./details.md).
+The product decisions and the full architecture discussion are preserved in [`brainstorm.md`](./brainstorm.md). The phased product plan is tracked in [`ROADMAP.md`](./ROADMAP.md), Build Week requirements are captured in [`details.md`](./details.md), and the recording plan is in [`DEMO_SCRIPT.md`](./DEMO_SCRIPT.md).
 
 ## Architecture
 

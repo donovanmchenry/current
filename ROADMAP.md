@@ -55,11 +55,12 @@ The MVP is complete when a judge can provide a source, receive a live GPT-5.6-ge
 
 ### Evidence and project documentation
 
-- Add a learning-science section to the GitHub README.
-- Compile primary research and reputable reviews supporting active recall, the testing effect, spaced practice, interleaving, self-explanation, timely feedback, worked examples, mastery learning, and interest-driven motivation.
-- Document limitations, especially the weak evidence for fixed learning-style categories.
-- Connect each supported method to a concrete Current interaction rather than presenting a decorative bibliography.
-- Document the live GPT-5.6 and Codex implementation clearly enough that judges can verify their roles.
+- [x] Add a learning-science section to the GitHub README.
+- [x] Compile primary research and reputable reviews supporting active recall, the testing effect, spaced practice, interleaving, self-explanation, timely feedback, worked examples, mastery learning, and interest-driven motivation.
+- [x] Document limitations, especially the weak evidence for fixed learning-style categories.
+- [x] Connect each supported method to a concrete Current interaction rather than presenting a decorative bibliography.
+- [x] Document the live GPT-5.6 and Codex implementation clearly enough that judges can verify their roles.
+- [x] Add a timed recording script and submission preflight.
 
 ## Phase 1: Personal Current
 
@@ -158,4 +159,3 @@ These may become useful later, but none proves Current's central claim as direct
 6. Preserve uploaded sources and add a reproducible demo reset.
 7. Compile and document the research foundation in the README.
 8. Add profiles and interest-driven setup after the Build Week loop is credible.
-
