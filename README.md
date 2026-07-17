@@ -41,6 +41,7 @@ The learner stays in control. Sources remain visible. Model decisions are labele
 - **Concept-level memory.** Current remembers misconceptions, successful support modes, attempts, progress, notes, and reflections by concept.
 - **Spaced review.** Clean recall earns a longer interval; concepts that needed help return sooner.
 - **Living curricula.** A research agent compares stored and current source evidence, shows the diff, identifies affected concepts, and waits for approval.
+- **Current Classroom.** Teachers can inspect class-level misconceptions, see interest-aware supports, preview the exact student experience, and approve curriculum updates before they reach the class.
 - **Reopenable sources.** Uploaded artifacts persist locally and can be viewed or downloaded from the workspace.
 - **A real reset button.** Judges can restore the seeded state in one click. Demo reliability is a product feature too.
 
@@ -82,6 +83,7 @@ Choose **Reset demo** from the Learning Map at any time to clear custom paths, n
 Next.js 16 + React 19
 ├── learning workspace      modular lesson state and adaptive supports
 ├── learning map            paths, concept memory, reviews, and updates
+├── Current Classroom       class signals, student supports, and teacher review
 ├── Responses API routes    planning, authoring, coaching, and research
 ├── local-first runtime     progress, notes, source artifacts, and memory
 └── OpenAI Sites            production deployment and runtime secrets
@@ -91,6 +93,8 @@ The important boundaries are deliberately small:
 
 - [`app/current-workspace.tsx`](./app/current-workspace.tsx) owns the learning loop.
 - [`app/learning-map.tsx`](./app/learning-map.tsx) owns navigation, review, and research updates.
+- [`app/classroom-workspace.tsx`](./app/classroom-workspace.tsx) owns the educator view and teacher-in-the-loop controls.
+- [`lib/classroom-catalog.ts`](./lib/classroom-catalog.ts) maps one shared objective into interest-aware student lessons.
 - [`app/api`](./app/api) contains the four GPT-5.6 workflows and deterministic fallbacks.
 - [`lib/model-routing.ts`](./lib/model-routing.ts) is the model policy, not four scattered strings.
 - [`lib/learning-runtime.ts`](./lib/learning-runtime.ts) stores progress and misconception memory.
@@ -134,9 +138,11 @@ Current does **not** label people as visual, auditory, or kinesthetic learners. 
 
 AI should make it easier for students to go deeper into what they care about, not just finish the worksheet faster.
 
-The individual learning workspace is the wedge. The longer-term product is **Current for Education**: teacher-approved living curricula, shared learning objectives with interest-aware examples, group misconception signals, and research updates that educators can inspect before they reach a class. The teacher remains the decision-maker; Current makes differentiation and curriculum maintenance tractable.
+The individual learning workspace proves the learning loop. **Current Classroom** shows how that loop can serve a class without turning AI into an answer machine or removing the teacher.
 
-That roadmap is intentionally outside the Build Week MVP. The current submission proves the smaller prerequisite: one source-grounded learning loop that adapts, persists, and stays current end to end.
+A teacher sees shared misconception signals, inspects the support chosen for an individual student, and opens the exact lesson that student will receive. The context can change from basketball to spaceflight; the objective, source, and scoring rubric do not. Research agents can propose curriculum changes, but nothing reaches students until the teacher approves the evidence and impact.
+
+This is an educator workflow, not a complete SIS or LMS. The Build Week implementation focuses on the differentiated-learning moment that matters: one shared objective, different useful contexts, observable learning gaps, and a teacher who remains the decision-maker.
 
 ## Run locally
 
@@ -165,13 +171,13 @@ npm run lint
 npm test
 ```
 
-The current suite contains 23 passing tests. `npm test` builds the production application before running endpoint, scheduler, persistence, and rendered-behavior checks.
+The current suite contains 24 passing tests. `npm test` builds the production application before running endpoint, scheduler, persistence, Classroom, and rendered-behavior checks.
 
 ## Status
 
 Build Week MVP: complete. Hosted product: [current-learning-lab.vanzm.chatgpt.site](https://current-learning-lab.vanzm.chatgpt.site). No account or credentials are required.
 
-Next: profiles and learner setup, deeper interest-aware adaptation, durable cloud sync, and the educator management layer. See [`ROADMAP.md`](./ROADMAP.md).
+Next: class creation, reusable assignments, learner profiles, durable cloud sync, and teacher-managed rosters. See [`ROADMAP.md`](./ROADMAP.md).
 
 ## License
 

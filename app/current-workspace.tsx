@@ -20,10 +20,12 @@ import {
   NotebookPen,
   Play,
   RotateCcw,
+  School,
   Send,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { classroomPathForStudent, type ClassroomStudent } from "../lib/classroom-catalog";
 import { basePaths, suggestedPath } from "../lib/learning-catalog";
 import type { GeneratedLesson, LearningConcept, LearningPath, LearningSource, LessonApplication, SourceSnapshot, SourceUpdateProposal } from "../lib/learning-path";
 import { currentModelLabel, type CurrentModelId } from "../lib/model-routing";
@@ -48,11 +50,12 @@ import {
 } from "../lib/learning-runtime";
 import { scheduleReview } from "../lib/spaced-review";
 import { clearSourceArtifacts, removeSourceArtifacts } from "../lib/source-artifacts";
+import { ClassroomWorkspace, type ClassroomUpdateStatus } from "./classroom-workspace";
 import { LearningMap } from "./learning-map";
 import { SourceArtifactDialog } from "./source-artifact-dialog";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
-type WorkspaceView = "lesson" | "map";
+type WorkspaceView = "lesson" | "map" | "classroom";
 type Evaluation = {
   score: number;
   verdict: string;
@@ -171,6 +174,7 @@ export function CurrentWorkspace() {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [notebookOpen, setNotebookOpen] = useState(false);
   const [activeArtifactSource, setActiveArtifactSource] = useState<LearningSource | null>(null);
+  const [classroomUpdateStatus, setClassroomUpdateStatus] = useState<ClassroomUpdateStatus>("ready");
   const hydrated = useRef(false);
   const lessonScrollRef = useRef<HTMLDivElement>(null);
   const lessonRequestKey = useRef<string | null>(null);
@@ -463,6 +467,14 @@ export function CurrentWorkspace() {
     setWorkspaceView("map");
   };
 
+  const openClassroom = () => {
+    setNotebookOpen(false);
+    setSourcesOpen(false);
+    setSidebarOpen(false);
+    setActiveReviewId(null);
+    setWorkspaceView("classroom");
+  };
+
   const resetLessonActivity = (nextMode: Mode) => {
     setMode(nextMode);
     setRecallAnswer("");
@@ -488,6 +500,23 @@ export function CurrentWorkspace() {
     lessonRequestKey.current = null;
     setLessonGeneration(null);
     setLessonRetryToken((current) => current + 1);
+  };
+
+  const openClassroomStudent = (student: ClassroomStudent, curriculumUpdateApplied: boolean) => {
+    const path = classroomPathForStudent(student, curriculumUpdateApplied);
+    setCustomPaths((current) => [...current.filter((item) => item.id !== path.id), path]);
+    setProgress((current) => ({
+      ...current,
+      [path.id]: current[path.id] ?? { currentConceptIndex: 0, completedConceptIndexes: [] },
+    }));
+    setActivePathId(path.id);
+    setActiveConceptIndex(0);
+    resetLessonActivity("read");
+    setSourcesOpen(false);
+    setNotebookOpen(false);
+    setSidebarOpen(false);
+    setWorkspaceView("lesson");
+    window.requestAnimationFrame(() => lessonScrollRef.current?.scrollTo({ top: 0 }));
   };
 
   const resetDemo = async () => {
@@ -519,6 +548,7 @@ export function CurrentWorkspace() {
     setSourcesOpen(false);
     setNotebookOpen(false);
     setActiveArtifactSource(null);
+    setClassroomUpdateStatus("ready");
     resetLessonActivity("read");
     setWorkspaceView("lesson");
   };
@@ -648,7 +678,7 @@ export function CurrentWorkspace() {
   };
 
   return (
-    <div className={`current-app ${workspaceView === "map" ? "map-view" : ""} ${notebookOpen ? "with-notebook" : ""}`}>
+    <div className={`current-app ${workspaceView === "map" ? "map-view" : ""} ${workspaceView === "classroom" ? "classroom-view" : ""} ${notebookOpen ? "with-notebook" : ""}`}>
       {sidebarOpen ? <button className="overlay" aria-label="Close course outline" onClick={() => setSidebarOpen(false)} /> : null}
       <button className={`notebook-overlay ${notebookOpen ? "open" : ""}`} aria-label="Close notebook" aria-hidden={!notebookOpen} tabIndex={notebookOpen ? 0 : -1} onClick={() => setNotebookOpen(false)} />
 
@@ -665,6 +695,9 @@ export function CurrentWorkspace() {
           <span className="track-icon"><FolderOpen size={16} /></span>
           <div><strong>{activePath.title}</strong><small>{activePath.concepts.length} concepts</small></div>
           <ChevronRight size={14} />
+        </button>
+        <button className="classroom-sidebar-entry" onClick={openClassroom}>
+          <span><School size={15} /></span><strong>Classroom</strong><ChevronRight size={14} />
         </button>
 
         <ol className="concept-path">
@@ -705,7 +738,14 @@ export function CurrentWorkspace() {
       </aside>
 
       <main className="learning-canvas">
-        {workspaceView === "map" ? (
+        {workspaceView === "classroom" ? (
+          <ClassroomWorkspace
+            onOpenLearningMap={openLearningMap}
+            onPreviewStudent={openClassroomStudent}
+            updateStatus={classroomUpdateStatus}
+            onSetUpdateStatus={setClassroomUpdateStatus}
+          />
+        ) : workspaceView === "map" ? (
           <LearningMap
             paths={paths}
             activePathId={activePath.id}
@@ -729,6 +769,7 @@ export function CurrentWorkspace() {
             onSourceChecked={storeCheckedSource}
             onOpenSource={setActiveArtifactSource}
             onResetDemo={resetDemo}
+            onOpenClassroom={openClassroom}
           />
         ) : (
           <>
@@ -940,7 +981,7 @@ function GenericReadModule({ concept, path, lesson, addToNotes, next }: { concep
   return (
     <article className="lesson-module read-module">
       <header className="module-header">
-        {lesson ? <span className="generation-provenance">{lesson.mode === "live" ? `Authored by ${currentModelLabel(lesson.model)}` : "Demo fallback"}</span> : null}
+        {lesson ? <span className="generation-provenance">{lesson.provenance ?? (lesson.mode === "live" ? `Authored by ${currentModelLabel(lesson.model)}` : "Demo fallback")}</span> : null}
         <h1>{lesson?.title ?? concept.title}</h1>
         <p>{lesson?.overview ?? concept.summary ?? concept.objective}</p>
       </header>

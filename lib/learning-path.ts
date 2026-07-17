@@ -12,6 +12,7 @@ export type LessonApplication = {
 };
 
 export type GeneratedLesson = {
+  provenance?: string;
   title: string;
   overview: string;
   reading: string[];

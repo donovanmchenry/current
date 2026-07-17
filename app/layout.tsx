@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: "Current",
       description: "Learn what changed. Prove what you understand.",
-      images: [{ url: `${origin}/og.png`, width: 1422, height: 800, alt: "Current source-grounded learning workspace" }],
+      images: [{ url: `${origin}/og.png`, width: 1974, height: 1037, alt: "Current Classroom educator workspace" }],
     },
     twitter: {
       card: "summary_large_image",

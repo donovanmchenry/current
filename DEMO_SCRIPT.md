@@ -1,20 +1,22 @@
 # Current Build Week Demo
 
-Target runtime: 2 minutes 45 seconds. This leaves a 15-second buffer below the submission limit.
+Target runtime: 2 minutes 50 seconds. This leaves a 10-second buffer below the submission limit.
 
 ## Recording script
 
 | Time | Screen action | Narration |
 | --- | --- | --- |
-| 0:00-0:15 | Open the Learning Map on the seeded AI agent engineering path. | "AI can explain almost anything, but explanations do not guarantee understanding, and fast-changing fields quickly make static courses stale. Current is a source-grounded learning workspace for lifelong learners." |
-| 0:15-0:30 | Briefly show Map, List, and Updates, then open Compaction. | "Instead of another chat window, Current organizes subjects into living learning paths. Concepts remember progress and misconceptions, while research updates stay separate and inspectable." |
-| 0:30-0:50 | In Read, open Sources and add the source-backed note. | "Each lesson begins with material grounded in sources the learner chose. This concept uses OpenAI's official compaction documentation, and useful claims remain linked to their source." |
-| 0:50-1:20 | Enter Recall, submit the prepared incomplete answer, and reveal the evaluation and support choices. | "Recall removes the source and asks me to reconstruct the idea. Current routes this frequent check to GPT-5.6 Luna for efficient, low-latency feedback against a narrow source-backed rubric. It does not just mark this wrong; it preserves the missing relationship so the next activity can target it." |
-| 1:20-1:40 | Choose Visual sequence, click Try again, and submit the prepared complete answer. | "Because I struggled, Current offers a visual sequence or concrete example. I can choose the support, retry, and the concept-level gap clears only when I can explain the complete flow." |
-| 1:40-2:00 | Complete the Apply interaction, enter Reflect, add the prepared reflection, and schedule review. | "Apply checks whether I can use the pattern, then reflection connects it to my own work. The result schedules spaced review, with a shorter interval when a concept required more support." |
-| 2:00-2:23 | Return to the Map, open Updates, inspect the source delta, and apply it. | "Current also keeps learning paths current. A research update shows the old and new evidence, names the affected concepts, and requires approval before changing the curriculum. Accepting it creates a review instead of silently rewriting the lesson." |
-| 2:23-2:35 | Open New Path, choose Use sample, generate the path, then jump cut to the Sol-labeled outline. | "A learner can start another path from a subject, a goal, files, and links. Sol plans the curriculum, Terra authors each lesson, and Luna handles frequent coaching. This path was generated from the attached evaluation note, not seeded into the demo." |
-| 2:35-2:45 | End on the full Learning Map. | "I built and refined Current in one continuous Codex task. Codex helped pressure-test the idea, rebuild the interface, implement the GPT-5.6 workflows and persistence, and verify the product with 23 automated tests. Current turns information into understanding that can keep changing with the field." |
+| 0:00-0:12 | Open the Learning Map on the seeded AI agent engineering path. | "AI can explain almost anything, but explanations do not guarantee understanding, and fast-changing fields quickly make static courses stale. Current is a source-grounded learning workspace." |
+| 0:12-0:30 | Open Compaction, show the source-backed Read material, and add the note. | "Instead of another chat window, Current organizes knowledge into living learning paths. Each lesson begins with material grounded in sources the learner can inspect." |
+| 0:30-0:55 | Enter Recall, submit the prepared incomplete answer, and reveal the evaluation. | "Recall removes the source and asks me to reconstruct the idea. Luna checks a narrow rubric, then preserves the exact missing relationship instead of simply marking the answer wrong." |
+| 0:55-1:10 | Choose Visual sequence, retry, and submit the prepared complete answer. | "Current changes the support, not the objective. The gap clears only when I can explain the complete flow." |
+| 1:10-1:25 | Complete Apply, enter Reflect, and schedule review. | "Apply checks transfer, reflection connects the concept to my work, and the result schedules spaced review based on how much support I needed." |
+| 1:25-1:40 | Return to Updates, inspect the source delta, and apply it. | "A research agent can detect changed evidence, but updates stay inspectable and require approval before they patch the curriculum." |
+| 1:40-1:50 | Open New Path, choose Use sample, then jump cut to the Sol-labeled outline. | "Sol can also plan a new source-grounded path from a goal, files, and links; this one came from the attached evaluation note." |
+| 1:50-2:08 | Open Classroom and show the assignment, class mastery, and shared recall gap. | "Current Classroom takes the same learning loop into K-12. A teacher sees one shared objective, class progress, and the misconception connecting several students." |
+| 2:08-2:28 | Select Jordan and open his student view. | "Jordan needs help treating slope as a rate. Current uses basketball scoring and unit labels because that context is useful to him, while the source, objective, and rubric remain the same for the class." |
+| 2:28-2:42 | Return to Classroom Updates and approve the proposed checkpoint. | "Research agents can propose a curriculum change and show its class impact, but nothing reaches students until the teacher approves it." |
+| 2:42-2:50 | End on the Classroom overview. | "I built Current in one continuous Codex task and routed planning, authoring, coaching, and research across GPT-5.6. Current helps every student go deeper without taking the teacher out of the loop." |
 
 ## Prepared responses
 
@@ -43,8 +45,9 @@ I would use compaction in a long-running research agent so it can preserve decis
 3. Confirm the recall result says **Evaluated by GPT-5.6 Luna**, not **Checked against the lesson**.
 4. Keep the prepared responses available for quick paste and close unrelated browser tabs.
 5. Record at a viewport where the learning path, lesson, and active side panel are readable without zooming.
-6. Record the Use sample path generation separately and cut from the populated form to the Sol-labeled outline so the main take does not wait on generation.
-7. Keep the exported video below 2:55, publish it publicly on YouTube, and verify audio before submitting.
+6. Confirm Classroom opens with Jordan selected and the pending update restored before recording that segment.
+7. Record the Use sample path generation separately and cut from the populated form to the Sol-labeled outline so the main take does not wait on generation.
+8. Keep the exported video below 2:55, publish it publicly on YouTube, and verify audio before submitting.
 
 ## Submission checklist
 

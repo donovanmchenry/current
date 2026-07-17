@@ -2,7 +2,7 @@
 
 Current helps people turn abundant information into durable understanding. Its broader purpose is to encourage students and lifelong learners to pursue personal interests in the age of AI, while giving them the structure to read critically, practice actively, and keep their knowledge current.
 
-This roadmap separates the Build Week completion gate from longer-term product development. The immediate goal is not to build a complete school platform. It is to prove one trustworthy, source-grounded learning loop end to end.
+This roadmap separates the Build Week completion gate from longer-term product development. The immediate goal is not to build a complete school platform. It is to prove one trustworthy, source-grounded learning loop and show how a teacher can apply it without surrendering curriculum control.
 
 ## Product principles
 
@@ -62,6 +62,14 @@ The MVP is complete when a judge can provide a source, receive a live GPT-5.6-ge
 - [x] Document the live GPT-5.6 and Codex implementation clearly enough that judges can verify their roles.
 - [x] Add a timed recording script and submission preflight.
 
+### Current Classroom proof
+
+- [x] Show one shared objective with interest-aware examples for individual students.
+- [x] Surface class-level misconception signals without ranking students publicly.
+- [x] Let a teacher inspect the exact support and lesson a student will receive.
+- [x] Require teacher approval before a research update changes the student path.
+- [ ] Add class creation, reusable assignment authoring, and durable rosters after Build Week.
+
 ## Phase 1: Personal Current
 
 ### Profiles and setup
@@ -101,7 +109,7 @@ The MVP is complete when a judge can provide a source, receive a live GPT-5.6-ge
 - Build a focused daily queue from due reviews, active goals, deadlines, and available session time.
 - Add export and deletion controls so learners retain ownership of their data.
 
-## Phase 3: Current for Education
+## Phase 3: Current Classroom
 
 The K-12 edition should be built with educators, not merely sold to them. Teacher controls should support judgment and differentiation rather than replace either.
 
@@ -151,11 +159,9 @@ These may become useful later, but none proves Current's central claim as direct
 
 ## Near-term build order
 
-1. Configure and verify the hosted GPT-5.6 integration.
-2. Generate complete lessons for user-created paths.
-3. Replace generic application length checks with concept-specific evaluation.
-4. Implement one real source snapshot, delta, patch, and review workflow.
-5. Connect performance to support selection and review timing.
-6. Preserve uploaded sources and add a reproducible demo reset.
-7. Compile and document the research foundation in the README.
-8. Add profiles and interest-driven setup after the Build Week loop is credible.
+1. Finish Classroom visual and interaction validation for the Build Week demo.
+2. Add learner profiles and age-appropriate interest collection.
+3. Let teachers create classes and assign any Current learning path.
+4. Persist rosters, assignments, approvals, and student progress across devices.
+5. Add teacher-authored constraints for sources, objectives, reading level, and accommodations.
+6. Pilot the misconception and differentiation workflow with educators before expanding analytics.

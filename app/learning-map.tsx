@@ -20,6 +20,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  School,
   Sparkles,
   Trash2,
   X,
@@ -91,6 +92,7 @@ type LearningMapProps = {
   onSourceChecked: (pathId: string, sourceId: string, snapshot: SourceSnapshot) => void;
   onOpenSource: (source: LearningSource) => void;
   onResetDemo: () => Promise<void>;
+  onOpenClassroom: () => void;
 };
 
 export function LearningMap({
@@ -116,6 +118,7 @@ export function LearningMap({
   onSourceChecked,
   onOpenSource,
   onResetDemo,
+  onOpenClassroom,
 }: LearningMapProps) {
   const [mapMode, setMapMode] = useState<MapMode>("map");
   const [mapTransitionDirection, setMapTransitionDirection] = useState<MapTransitionDirection>("forward");
@@ -335,6 +338,7 @@ export function LearningMap({
           <button role="tab" aria-selected={mapMode === "notes"} className={mapMode === "notes" ? "active" : ""} onClick={() => switchMapMode("notes")}><NotebookPen size={14} /> Notes{noteEntries.length ? <span className="updates-tab-count">{noteEntries.length}</span> : null}</button>
         </div>
         <div className="map-toolbar-end">
+          <button className="map-classroom-link" onClick={onOpenClassroom}><School size={13} /><span>Classroom</span></button>
           {resetConfirmOpen ? (
             <div className="map-reset-confirm" role="group" aria-label="Confirm demo reset">
               <span>Reset demo?</span>

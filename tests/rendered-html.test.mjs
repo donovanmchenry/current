@@ -254,6 +254,45 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.learning-map-body[^}]*display:\s*block[^}]*overflow-y:\s*auto/s);
 });
 
+test("connects Current Classroom to the adaptive learner runtime", async () => {
+  const workspace = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
+  const classroom = await readFile(new URL("../app/classroom-workspace.tsx", import.meta.url), "utf8");
+  const catalog = await readFile(new URL("../lib/classroom-catalog.ts", import.meta.url), "utf8");
+  const map = await readFile(new URL("../app/learning-map.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(workspace, /type WorkspaceView = "lesson" \| "map" \| "classroom"/);
+  assert.match(workspace, /className="classroom-sidebar-entry"[\s\S]*onClick=\{openClassroom\}/);
+  assert.match(workspace, /<ClassroomWorkspace[\s\S]*onOpenLearningMap=\{openLearningMap\}[\s\S]*onPreviewStudent=\{openClassroomStudent\}[\s\S]*updateStatus=\{classroomUpdateStatus\}/);
+  assert.match(workspace, /classroomPathForStudent\(student, curriculumUpdateApplied\)[\s\S]*setCustomPaths[\s\S]*setWorkspaceView\("lesson"\)/);
+  assert.match(workspace, /onOpenClassroom=\{openClassroom\}/);
+  assert.match(map, /onOpenClassroom: \(\) => void/);
+  assert.match(map, /className="map-classroom-link" onClick=\{onOpenClassroom\}/);
+
+  assert.match(classroom, /aria-label="Current Classroom"/);
+  assert.match(classroom, /type ClassroomView = "overview" \| "students" \| "updates"/);
+  assert.match(classroom, /Shared recall gap/);
+  assert.match(classroom, /Review group/);
+  assert.match(classroom, /aria-label="Search students"/);
+  assert.match(classroom, /Approve update/);
+  assert.match(classroom, /Current proposes changes\. Teachers decide what reaches students\./);
+  assert.match(classroom, /Open student view/);
+  assert.match(classroom, /onPreviewStudent\(selectedStudent, updateStatus === "applied"\)/);
+  assert.match(catalog, /export function classroomPathForStudent/);
+  assert.match(catalog, /curriculumUpdateApplied[\s\S]*Compare slope and intercept across tables, graphs, equations, and verbal descriptions/);
+  assert.match(catalog, /Personalized context does not change the class objective/);
+  assert.match(catalog, /provenance: "Adapted from teacher-approved materials"/);
+  assert.match(catalog, /y = 3x \+ 20/);
+  assert.match(catalog, /CCSS 8\.EE\.B\.5/);
+
+  assert.match(styles, /\.classroom-shell[^}]*grid-template-columns:\s*220px minmax\(0, 1fr\) 310px/s);
+  assert.match(styles, /\.classroom-metrics[^}]*grid-template-columns:\s*repeat\(4, 1fr\)/s);
+  assert.match(styles, /\.classroom-assignment-band[^}]*border-radius:\s*8px/s);
+  assert.match(styles, /\.classroom-roster > header, \.classroom-roster > button[^}]*grid-template-columns/s);
+  assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.classroom-shell[^}]*flex-direction:\s*column/s);
+  assert.doesNotMatch(classroom, /text-transform|uppercase/);
+});
+
 test("generates a source-derived learning path without an API key", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-path-api`);
