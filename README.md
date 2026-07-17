@@ -43,18 +43,22 @@ The lesson remains modular and interactive throughout: concept path on the left,
 
 To restore the seeded judging state, open the Learning Map and choose **Reset demo**. Current clears custom paths, local source artifacts, notes, reviews, and learned preferences, then returns to the Compaction lesson at Read.
 
-## GPT-5.6 Sol
+## Task-routed GPT-5.6
 
-The live recall evaluator is implemented in `app/api/coach/route.ts` with the Responses API:
+Current uses the Responses API and routes each learning task to the GPT-5.6 model whose capability, latency, and cost profile fits the work. The policy is centralized in `lib/model-routing.ts`, and every live response returns its model ID so the interface can show quiet, auditable provenance.
 
-- Model: `gpt-5.6-sol`
-- Reasoning effort: `high`
-- Structured output: strict JSON schema
-- Task: grade free-form recall of compaction against a narrow, source-backed rubric and identify the missing link
+| Task | Route | Why |
+| --- | --- | --- |
+| Learning-path architecture | `gpt-5.6-sol`, high reasoning | Frontier judgment for sequencing prerequisites, objectives, and source evidence into a coherent curriculum. |
+| Research-source updates | `gpt-5.6-sol`, high reasoning | Quality-first comparison before proposing a curriculum change that still requires learner approval. |
+| Lesson authoring | `gpt-5.6-terra`, medium reasoning | Strong generation quality with a better cost balance for turning each concept into Read, Recall, Apply, and Reflect activities. |
+| Recall and application coaching | `gpt-5.6-luna`, low reasoning | Efficient, low-latency evaluation for the highest-volume interaction, constrained by a strict JSON schema and a narrow source-backed rubric. |
 
-When `OPENAI_API_KEY` is absent or a live call fails, the same endpoint returns a deterministic rubric-based evaluation. This keeps the three-minute demo reproducible while preserving the real GPT-5.6 integration path.
+This follows OpenAI's [GPT-5.6 model guidance](https://developers.openai.com/api/docs/guides/latest-model): Sol for flagship capability, Terra for balanced intelligence and cost, and Luna for efficient high-volume workloads. Routing is task-specific rather than a claim that one model is universally best.
 
-Path previews, generated lessons, recall evaluations, and source-update proposals identify when GPT-5.6 Sol produced the result. Deterministic output is labeled as a demo fallback so the model-backed workflow remains inspectable during judging.
+When `OPENAI_API_KEY` is absent or a live call fails, each endpoint returns a deterministic task-specific fallback. This keeps the three-minute demo reproducible while preserving the real GPT-5.6 integration path.
+
+Path previews, generated lessons, recall evaluations, and source-update proposals identify which GPT-5.6 model produced the result. Deterministic output is labeled as a demo fallback so the model-backed workflow remains inspectable during judging.
 
 The lesson cites the official [compaction](https://developers.openai.com/api/docs/guides/compaction) and [conversation state](https://developers.openai.com/api/docs/guides/conversation-state) guides.
 
@@ -99,7 +103,8 @@ The product decisions and the full architecture discussion are preserved in [`br
 
 - `app/current-workspace.tsx`: learning modes, adaptive supports, notebook, source panel, and session state
 - `app/learning-map.tsx`: path navigation, concept memory, review queue, and research updates
-- `app/api/coach/route.ts`: GPT-5.6 Sol recall evaluation with deterministic fallback
+- `lib/model-routing.ts`: task-specific GPT-5.6 model and reasoning policy
+- `app/api/coach/route.ts`: low-latency GPT-5.6 recall evaluation with deterministic fallback
 - `lib/learning-runtime.ts`: persisted path progress, misconception memory, and review quality
 - `lib/source-artifacts.ts`: device-local storage for reopenable uploaded sources
 - `lib/spaced-review.ts`: SM-2-inspired review scheduling

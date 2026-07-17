@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { GeneratedLesson, LearningConcept, LearningSource, LessonPracticeType } from "@/lib/learning-path";
+import { currentModelRoutes } from "@/lib/model-routing";
 
 type LessonRequest = {
   pathTitle?: string;
@@ -146,13 +147,14 @@ export async function POST(request: Request) {
   if (!apiKey) return NextResponse.json(fallback);
 
   try {
+    const route = currentModelRoutes.lessonAuthor;
     const sourceContext = (body.sources ?? []).slice(0, 6).map((source) => ({ id: source.id, title: source.title, detail: source.detail, href: source.href }));
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-5.6-sol",
-        reasoning: { effort: "high" },
+        model: route.model,
+        reasoning: { effort: route.reasoningEffort },
         store: false,
         max_output_tokens: 3200,
         input: [
@@ -209,7 +211,7 @@ export async function POST(request: Request) {
     if (!text) throw new Error("OpenAI response did not contain output text");
     const lesson = validateLesson(JSON.parse(text), practiceType);
     if (!lesson) throw new Error("OpenAI response did not match the lesson contract");
-    return NextResponse.json({ ...lesson, mode: "live" as const });
+    return NextResponse.json({ ...lesson, mode: "live" as const, model: route.model });
   } catch (error) {
     console.error("Live lesson generation failed; using deterministic fallback", error);
     return NextResponse.json(fallback);

@@ -1,3 +1,5 @@
+import type { CurrentModelId } from "./model-routing";
+
 export type LessonPracticeType = "multiple_choice" | "true_false" | "open_response";
 
 export type LessonApplication = {
@@ -22,6 +24,7 @@ export type GeneratedLesson = {
   reflectionPrompt: string;
   sourceIds: string[];
   mode: "demo" | "live";
+  model?: CurrentModelId;
 };
 
 export type LearningConcept = {
@@ -73,6 +76,7 @@ export type SourceUpdateProposal = {
   patches: SourceConceptPatch[];
   latestSnapshot: SourceSnapshot;
   mode: "demo" | "live";
+  model?: CurrentModelId;
 };
 
 export type LearningPath = {
@@ -96,4 +100,5 @@ export type GeneratedLearningPath = {
   relatedPathId: string | null;
   sourceSnapshots: Array<{ sourceId: string; snapshot: SourceSnapshot }>;
   mode: "demo" | "live";
+  model?: CurrentModelId;
 };

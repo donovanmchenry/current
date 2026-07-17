@@ -40,6 +40,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { suggestedPath } from "@/lib/learning-catalog";
 import type { LearningPath, LearningSource, SourceSnapshot, SourceUpdateProposal } from "@/lib/learning-path";
+import { currentModelLabel } from "@/lib/model-routing";
 import { isDue, progressForPath, type ConceptMemory, type LearnerProfile, type PathProgress, type ReviewItem } from "@/lib/learning-runtime";
 import { selectBackgroundSource } from "@/lib/source-monitor";
 import { CreatePathDialog } from "./create-path-dialog";
@@ -382,7 +383,7 @@ export function LearningMap({
                   <article className={`agent-update-row ${update.status}`} key={update.id}>
                     <span className="agent-update-row-icon">{update.status === "applied" ? <Check size={17} /> : update.status === "dismissed" ? <X size={17} /> : <FileDiff size={17} />}</span>
                     <div className="agent-update-row-content">
-                      <small>{path?.title ?? "Learning path"} · {update.mode === "live" ? "GPT-5.6 source comparison" : "Source comparison"}</small>
+                      <small>{path?.title ?? "Learning path"} · {update.mode === "live" ? `Compared by ${currentModelLabel(update.model)}` : "Source comparison"}</small>
                       <h2>{update.status === "applied" ? `${update.sourceTitle} update applied` : update.status === "dismissed" ? `${update.sourceTitle} update dismissed` : `${update.sourceTitle} changed`}</h2>
                       <p>{update.summary}</p>
                       {update.status === "ready" && !isReviewed ? <button className="activity-action" onClick={() => setReviewedUpdateId(update.id)}>Review evidence <ArrowRight size={12} /></button> : null}

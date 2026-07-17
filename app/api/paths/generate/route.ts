@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { GeneratedLearningPath, LearningConcept } from "@/lib/learning-path";
+import { currentModelRoutes } from "@/lib/model-routing";
 import { createSourceSnapshot } from "@/lib/source-updates";
 
 const allowedTextExtensions = new Set(["csv", "json", "md", "txt"]);
@@ -416,6 +417,7 @@ export async function POST(request: Request) {
   if (!apiKey) return NextResponse.json(fallback);
 
   try {
+    const route = currentModelRoutes.pathPlanner;
     const sourceSections = [
       ...fetched.map((source) => `Source ID: ${source.id}\nSource link: ${source.title}\nURL: ${source.url}\n${source.text.slice(0, 16_000)}`),
       ...textFiles.map((source) => `Source ID: ${source.id}\nSource file: ${source.name}\n${source.text.slice(0, 16_000)}`),
@@ -437,8 +439,8 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-5.6-sol",
-        reasoning: { effort: "high" },
+        model: route.model,
+        reasoning: { effort: route.reasoningEffort },
         store: false,
         max_output_tokens: 2200,
         input: [
@@ -491,7 +493,7 @@ export async function POST(request: Request) {
     if (!text) throw new Error("OpenAI response did not contain output text");
     const generated = validateGeneratedPath(JSON.parse(text));
     if (!generated) throw new Error("OpenAI response did not match the learning path contract");
-    return NextResponse.json({ ...generated, sourceSnapshots, mode: "live" as const });
+    return NextResponse.json({ ...generated, sourceSnapshots, mode: "live" as const, model: route.model });
   } catch (error) {
     console.error("Live path generation failed; using deterministic fallback", error);
     return NextResponse.json(fallback);

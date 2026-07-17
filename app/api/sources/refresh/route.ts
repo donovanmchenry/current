@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { LearningConcept, LearningSource, SourceConceptPatch, SourceUpdateProposal } from "@/lib/learning-path";
+import { currentModelRoutes } from "@/lib/model-routing";
 import { createSourceSnapshot, fallbackSourceUpdate, hasMeaningfulSourceChange, truncateSourceText } from "@/lib/source-updates";
 
 type RefreshRequest = {
@@ -79,7 +80,7 @@ function outputText(result: unknown): string | null {
   return null;
 }
 
-function validateLiveProposal(value: unknown, fallback: SourceUpdateProposal, conceptCount: number): SourceUpdateProposal | null {
+function validateLiveProposal(value: unknown, fallback: SourceUpdateProposal, conceptCount: number, model: SourceUpdateProposal["model"]): SourceUpdateProposal | null {
   if (!value || typeof value !== "object") return null;
   const proposal = value as Partial<SourceUpdateProposal>;
   if (typeof proposal.summary !== "string" || typeof proposal.beforeExcerpt !== "string" || typeof proposal.afterExcerpt !== "string") return null;
@@ -103,6 +104,7 @@ function validateLiveProposal(value: unknown, fallback: SourceUpdateProposal, co
     affectedConceptIndexes: indexes,
     patches,
     mode: "live",
+    model,
   };
 }
 
@@ -135,12 +137,13 @@ export async function POST(request: Request) {
     if (!apiKey) return NextResponse.json({ changed: true, proposal: fallback });
 
     try {
+      const route = currentModelRoutes.sourceResearch;
       const response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
         body: JSON.stringify({
-          model: "gpt-5.6-sol",
-          reasoning: { effort: "high" },
+          model: route.model,
+          reasoning: { effort: route.reasoningEffort },
           store: false,
           max_output_tokens: 8000,
           input: [
@@ -192,7 +195,7 @@ export async function POST(request: Request) {
       if (!response.ok) throw new Error(`OpenAI request failed: ${response.status}`);
       const text = outputText(await response.json());
       if (!text) throw new Error("OpenAI response did not contain output text");
-      const proposal = validateLiveProposal(JSON.parse(text), fallback, concepts.length);
+      const proposal = validateLiveProposal(JSON.parse(text), fallback, concepts.length, route.model);
       if (!proposal) throw new Error("OpenAI response did not match the update contract");
       return NextResponse.json({ changed: true, proposal });
     } catch (error) {

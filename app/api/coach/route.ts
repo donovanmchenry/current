@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { currentModelRoutes, type CurrentModelId } from "@/lib/model-routing";
+
 type Evaluation = {
   score: number;
   verdict: string;
@@ -7,6 +9,7 @@ type Evaluation = {
   misconception: string | null;
   nextPrompt: string;
   mode: "live" | "demo";
+  model?: CurrentModelId;
 };
 
 type RecallRubric = {
@@ -141,6 +144,7 @@ export async function POST(request: Request) {
   if (!apiKey) return NextResponse.json(demoEvaluation(answer, rubric, phase));
 
   try {
+    const route = currentModelRoutes.learningCoach;
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -148,8 +152,8 @@ export async function POST(request: Request) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-5.6-sol",
-        reasoning: { effort: "high" },
+        model: route.model,
+        reasoning: { effort: route.reasoningEffort },
         input: [
           {
             role: "system",
@@ -189,7 +193,7 @@ export async function POST(request: Request) {
     const text = outputText(result);
     if (!text) throw new Error("OpenAI response did not contain output text");
     const evaluation = JSON.parse(text) as Omit<Evaluation, "mode">;
-    return NextResponse.json({ ...evaluation, mode: "live" });
+    return NextResponse.json({ ...evaluation, mode: "live", model: route.model });
   } catch (error) {
     console.error("Live evaluation failed; using deterministic fallback", error);
     return NextResponse.json(demoEvaluation(answer, rubric, phase));
