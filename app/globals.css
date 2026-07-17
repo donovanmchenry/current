@@ -572,8 +572,10 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .create-path-header h2 { margin: 0; font-size: 14px; font-weight: 580; }
 .create-path-icon { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; color: var(--text-secondary); background: #252525; }
 .create-path-form, .path-preview { min-height: 0; overflow-y: auto; padding: 5px 20px 20px; }
+.path-sample-action { min-height: 28px; display: inline-flex; align-items: center; gap: 5px; float: right; margin-bottom: 5px; border: 0; border-radius: 6px; padding: 0 8px; color: var(--text-secondary); background: #252525; font-size: 9px; cursor: pointer; }
+.path-sample-action:hover { color: var(--text); background: #303030; }
 .create-path-form > label { display: block; margin-top: 15px; }
-.create-path-form > label:first-child { margin-top: 3px; }
+.create-path-form > label:first-of-type { clear: both; margin-top: 3px; }
 .create-path-form label > span, .path-source-fields legend { display: block; margin-bottom: 7px; color: var(--text-secondary); font-size: 10px; font-weight: 540; }
 .create-path-form input, .create-path-form textarea { width: 100%; border: 0; border-radius: 7px; outline: 0; padding: 10px 11px; color: var(--text); background: #202020; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); font: inherit; font-size: 12px; }
 .create-path-form textarea { min-height: 96px; resize: vertical; line-height: 1.55; }

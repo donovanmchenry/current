@@ -13,7 +13,7 @@ Target runtime: 2 minutes 45 seconds. This leaves a 15-second buffer below the s
 | 1:20-1:40 | Choose Visual sequence, click Try again, and submit the prepared complete answer. | "Because I struggled, Current offers a visual sequence or concrete example. I can choose the support, retry, and the concept-level gap clears only when I can explain the complete flow." |
 | 1:40-2:00 | Complete the Apply interaction, enter Reflect, add the prepared reflection, and schedule review. | "Apply checks whether I can use the pattern, then reflection connects it to my own work. The result schedules spaced review, with a shorter interval when a concept required more support." |
 | 2:00-2:23 | Return to the Map, open Updates, inspect the source delta, and apply it. | "Current also keeps learning paths current. A research update shows the old and new evidence, names the affected concepts, and requires approval before changing the curriculum. Accepting it creates a review instead of silently rewriting the lesson." |
-| 2:23-2:35 | Show the New Path entry point, then open its source and goal fields without submitting. | "A learner can start another path from a subject, a goal, files, and links. Sol plans the curriculum, Terra authors each lesson, and Luna handles frequent coaching, while the deterministic seeded path keeps this short demo reproducible." |
+| 2:23-2:35 | Open New Path, choose Use sample, generate the path, then jump cut to the Sol-labeled outline. | "A learner can start another path from a subject, a goal, files, and links. Sol plans the curriculum, Terra authors each lesson, and Luna handles frequent coaching. This path was generated from the attached evaluation note, not seeded into the demo." |
 | 2:35-2:45 | End on the full Learning Map. | "I built and refined Current in one continuous Codex task. Codex helped pressure-test the idea, rebuild the interface, implement the GPT-5.6 workflows and persistence, and verify the product with 23 automated tests. Current turns information into understanding that can keep changing with the field." |
 
 ## Prepared responses
@@ -43,7 +43,7 @@ I would use compaction in a long-running research agent so it can preserve decis
 3. Confirm the recall result says **Evaluated by GPT-5.6 Luna**, not **Checked against the lesson**.
 4. Keep the prepared responses available for quick paste and close unrelated browser tabs.
 5. Record at a viewport where the learning path, lesson, and active side panel are readable without zooming.
-6. Do not wait for live path generation in the main take; show the creation form and use a separate cut only if generation materially strengthens the final edit.
+6. Record the Use sample path generation separately and cut from the populated form to the Sol-labeled outline so the main take does not wait on generation.
 7. Keep the exported video below 2:55, publish it publicly on YouTube, and verify audio before submitting.
 
 ## Submission checklist

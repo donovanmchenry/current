@@ -72,6 +72,8 @@ The seeded path teaches **context compaction for long-running agents** from Open
 5. Reflect, schedule review, and return to the Learning Map.
 6. Open **Updates** to inspect a source delta, apply the curriculum patch, and create a new review.
 
+To verify that path generation is not hardcoded, open **New path**, choose **Use sample**, and generate the attached RAG evaluation note. Sol returns a new source-grounded path with visible model provenance.
+
 Choose **Reset demo** from the Learning Map at any time to clear custom paths, notes, reviews, source artifacts, and learned preferences.
 
 ## Architecture
@@ -167,7 +169,7 @@ The current suite contains 23 passing tests. `npm test` builds the production ap
 
 ## Status
 
-Build Week MVP: complete. Hosted product: [current-learning-lab.vanzm.chatgpt.site](https://current-learning-lab.vanzm.chatgpt.site).
+Build Week MVP: complete. Hosted product: [current-learning-lab.vanzm.chatgpt.site](https://current-learning-lab.vanzm.chatgpt.site). No account or credentials are required.
 
 Next: profiles and learner setup, deeper interest-aware adaptation, durable cloud sync, and the educator management layer. See [`ROADMAP.md`](./ROADMAP.md).
 

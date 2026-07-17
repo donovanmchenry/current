@@ -198,6 +198,10 @@ test("connects the lesson shell to a functional learning map", async () => {
   assert.match(runtime, /export function isStoredSourceUpdate/);
   assert.match(runtime, /export function isStoredCheckedSource/);
   assert.match(createPath, /submittedLinks\.forEach\(\(link\) => form\.append\("links", link\)\)/);
+  assert.match(createPath, /const loadSampleInputs = async \(\) =>/);
+  assert.match(createPath, /fetch\("\/samples\/rag-evaluation\.md"\)/);
+  assert.match(createPath, /new File\(\[await response\.blob\(\)\], "rag-evaluation\.md"/);
+  assert.match(createPath, /className="path-sample-action"[\s\S]*Use sample/);
   assert.match(createPath, /await storeSourceArtifacts\(fileArtifacts\)/);
   assert.match(createPath, /artifactId: `\$\{id\}:\$\{sourceId\}`/);
   assert.match(createPath, /Planned by \$\{currentModelLabel\(generated\.model\)\}/);

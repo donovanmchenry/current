@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, FileText, Link2, LoaderCircle, Paperclip, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, FileText, Link2, LoaderCircle, Paperclip, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { GeneratedLearningPath, LearningPath, LearningSource } from "@/lib/learning-path";
@@ -69,6 +69,24 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
   const resetGenerated = () => {
     setGenerated(null);
     setError(null);
+  };
+
+  const loadSampleInputs = async () => {
+    setSubject("Retrieval-augmented generation");
+    setGoal("Learn how to separate retrieval failures from generation failures, then design a small evaluation set for a support assistant.");
+    setLinkInput("");
+    setLinks([]);
+    setGenerated(null);
+    setError(null);
+    try {
+      const response = await fetch("/samples/rag-evaluation.md");
+      if (!response.ok) throw new Error("The sample source could not be loaded.");
+      const source = new File([await response.blob()], "rag-evaluation.md", { type: "text/markdown" });
+      setFiles([source]);
+    } catch (sampleError) {
+      setFiles([]);
+      setError(sampleError instanceof Error ? sampleError.message : "The sample source could not be loaded.");
+    }
   };
 
   const addLink = () => {
@@ -245,6 +263,7 @@ export function CreatePathDialog({ open, onClose, onCreate }: CreatePathDialogPr
           </div>
         ) : (
           <form className="create-path-form" onSubmit={generatePath}>
+            <button type="button" className="path-sample-action" onClick={loadSampleInputs}><Sparkles size={13} /> Use sample</button>
             <label>
               <span>Subject</span>
               <input ref={subjectRef} value={subject} maxLength={80} onChange={(event) => { setSubject(event.target.value); resetGenerated(); }} placeholder="Causal inference" required />
