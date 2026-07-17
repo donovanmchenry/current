@@ -264,7 +264,7 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
 
   assert.match(workspace, /type WorkspaceView = "lesson" \| "map" \| "classroom"/);
   assert.match(workspace, /className="classroom-sidebar-entry"[\s\S]*onClick=\{openClassroom\}/);
-  assert.match(workspace, /<ClassroomWorkspace[\s\S]*onOpenLearningMap=\{openLearningMap\}[\s\S]*onPreviewStudent=\{openClassroomStudent\}[\s\S]*updateStatus=\{classroomUpdateStatus\}/);
+  assert.match(workspace, /<ClassroomWorkspace[\s\S]*onOpenLearningMap=\{openLearningMap\}[\s\S]*onPreviewStudent=\{openClassroomStudent\}[\s\S]*onLaunchStudentSession=\{launchClassroomStudentSession\}[\s\S]*updateStatus=\{classroomUpdateStatus\}/);
   assert.match(workspace, /classroomPathForAssignment\(student, assignment, sourcePath, curriculumUpdateApplied\)[\s\S]*setCustomPaths[\s\S]*setWorkspaceView\("lesson"\)/);
   assert.match(workspace, /const createClassroomClass = \(input: NewClassInput\)/);
   assert.match(workspace, /const createClassroomAssignment = \(input: NewAssignmentInput\)/);
@@ -280,7 +280,9 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(classroom, /aria-label="Search students"/);
   assert.match(classroom, /Approve update/);
   assert.match(classroom, /Current proposes changes\. Teachers decide what reaches students\./);
-  assert.match(classroom, /Open student view/);
+  assert.match(classroom, /Preview as student/);
+  assert.match(classroom, /Launch student session/);
+  assert.match(classroom, /onLaunchStudentSession: \(student: ClassroomStudent, assignment: ClassroomAssignment\) => void/);
   assert.match(classroom, /onPreviewStudent\(selectedStudent, activeAssignment, curriculumUpdateAvailable && updateStatus === "applied"\)/);
   assert.match(classroom, /Assign targeted review/);
   assert.match(classroom, /CreateClassDialog/);
@@ -306,7 +308,10 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(styles, /\.classroom-preview-bar[^}]*top:\s*54px/s);
   assert.match(styles, /\.classroom-dialog-overlay[^}]*backdrop-filter:\s*blur\(8px\)/s);
   assert.match(styles, /\.classroom-mobile-management[^}]*display:\s*grid/s);
-  assert.match(workspace, /Previewing \{classroomPreviewStudent\.name\}/);
+  assert.match(workspace, /url\.searchParams\.set\("view", "student"\)/);
+  assert.match(workspace, /openClassroomStudent\(student, assignment,[\s\S]*"student"\)/);
+  assert.match(workspace, /isStudentSession \? "Close session" : "Return to Classroom"/);
+  assert.match(styles, /\.track-title\.student-session-track[^}]*cursor:\s*default/s);
   assert.match(workspace, /classroomUpdateStatus,[\s\S]*classroomNavigation,[\s\S]*classroomStudentEvidence/);
   assert.match(workspace, /classroom-curriculum-review-/);
   assert.match(workspace, /classroom-support-review-/);

@@ -24,7 +24,7 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   classroomPathForStudent,
   classroomPathForAssignment,
@@ -89,6 +89,12 @@ type LessonGenerationState = {
   key: string;
   status: "loading" | "error";
   message?: string;
+};
+
+type ClassroomSession = {
+  studentId: string;
+  assignmentId: string;
+  mode: "teacher-preview" | "student";
 };
 
 const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
@@ -203,7 +209,9 @@ export function CurrentWorkspace() {
   const [classroomClasses, setClassroomClasses] = useState<ClassroomClass[]>(defaultClassroomClasses);
   const [classroomAssignments, setClassroomAssignments] = useState<ClassroomAssignment[]>(defaultClassroomAssignments);
   const [classroomCustomStudents, setClassroomCustomStudents] = useState<ClassroomStudent[]>([]);
-  const [classroomPreview, setClassroomPreview] = useState<{ studentId: string; assignmentId: string } | null>(null);
+  const [classroomPreview, setClassroomPreview] = useState<ClassroomSession | null>(null);
+  const [studentSessionRequest, setStudentSessionRequest] = useState<{ studentId: string; assignmentId: string } | null>(null);
+  const [studentSessionError, setStudentSessionError] = useState("");
   const hydrated = useRef(false);
   const lessonScrollRef = useRef<HTMLDivElement>(null);
   const lessonRequestKey = useRef<string | null>(null);
@@ -239,7 +247,9 @@ export function CurrentWorkspace() {
   const activeClassroomStudents = activeClassroomClass.studentIds.map((studentId) => allClassroomStudents.find((student) => student.id === studentId)).filter((student): student is ClassroomStudent => Boolean(student));
   const classroomRoster = useMemo(() => classroomStudentsWithEvidence(activeClassroomStudents, classroomStudentEvidence, activeClassroomAssignment?.id ?? "unassigned"), [activeClassroomAssignment?.id, activeClassroomStudents, classroomStudentEvidence]);
   const classroomPreviewStudent = classroomPreview ? allClassroomStudents.find((student) => student.id === classroomPreview.studentId) ?? null : null;
-  const classroomAvailablePaths = paths.filter((path) => !path.classroomStudentId);
+  const classroomAvailablePaths = useMemo(() => paths.filter((path) => !path.classroomStudentId), [paths]);
+  const classroomPreviewAssignment = classroomPreview ? classroomAssignments.find((assignment) => assignment.id === classroomPreview.assignmentId) ?? null : null;
+  const isStudentSession = classroomPreview?.mode === "student";
   const activeClassroomAssignmentPath = activeClassroomAssignment?.id === defaultClassroomAssignmentId
     ? classroomPathForStudent(classroomRoster[0] ?? classroomStudents[0], classroomUpdateStatus === "applied")
     : paths.find((path) => path.id === activeClassroomAssignment?.pathId) ?? null;
@@ -285,6 +295,12 @@ export function CurrentWorkspace() {
         if (savedMapUi?.proposalStatus === "applied") setResearchUpdateApplied(true);
       } catch {
         window.localStorage.removeItem(runtimeStorageKey);
+      }
+      const params = new URLSearchParams(window.location.search);
+      const requestedStudentId = params.get("student");
+      const requestedAssignmentId = params.get("assignment");
+      if (params.get("view") === "student" && requestedStudentId && requestedAssignmentId) {
+        setStudentSessionRequest({ studentId: requestedStudentId, assignmentId: requestedAssignmentId });
       }
       hydrated.current = true;
     });
@@ -546,7 +562,7 @@ export function CurrentWorkspace() {
     setWorkspaceView("classroom");
   };
 
-  const resetLessonActivity = (nextMode: Mode) => {
+  const resetLessonActivity = useCallback((nextMode: Mode) => {
     setMode(nextMode);
     setRecallAnswer("");
     setEvaluation(null);
@@ -565,7 +581,7 @@ export function CurrentWorkspace() {
     setScheduledReviewAt(null);
     setCompletionNextIndex(null);
     setActiveReviewId(null);
-  };
+  }, []);
 
   const retryLessonGeneration = () => {
     lessonRequestKey.current = null;
@@ -573,7 +589,7 @@ export function CurrentWorkspace() {
     setLessonRetryToken((current) => current + 1);
   };
 
-  const openClassroomStudent = (student: ClassroomStudent, assignment: ClassroomAssignment, curriculumUpdateApplied: boolean) => {
+  const openClassroomStudent = useCallback((student: ClassroomStudent, assignment: ClassroomAssignment, curriculumUpdateApplied: boolean, sessionMode: ClassroomSession["mode"] = "teacher-preview") => {
     const sourcePath = classroomAvailablePaths.find((candidate) => candidate.id === assignment.pathId);
     const path = classroomPathForAssignment(student, assignment, sourcePath, curriculumUpdateApplied);
     setCustomPaths((current) => [...current.filter((item) => item.id !== path.id), path]);
@@ -583,13 +599,53 @@ export function CurrentWorkspace() {
     }));
     setActivePathId(path.id);
     setActiveConceptIndex(0);
-    setClassroomPreview({ studentId: student.id, assignmentId: assignment.id });
+    setClassroomPreview({ studentId: student.id, assignmentId: assignment.id, mode: sessionMode });
+    setClassroomNavigation((current) => ({ ...current, activeClassId: assignment.classId, activeAssignmentId: assignment.id, selectedStudentId: student.id }));
+    setStudentSessionError("");
     resetLessonActivity("read");
     setSourcesOpen(false);
     setNotebookOpen(false);
     setSidebarOpen(false);
     setWorkspaceView("lesson");
     window.requestAnimationFrame(() => lessonScrollRef.current?.scrollTo({ top: 0 }));
+  }, [classroomAvailablePaths, resetLessonActivity]);
+
+  useEffect(() => {
+    if (!studentSessionRequest) return;
+    const frame = window.requestAnimationFrame(() => {
+      const student = allClassroomStudents.find((candidate) => candidate.id === studentSessionRequest.studentId);
+      const assignment = classroomAssignments.find((candidate) => candidate.id === studentSessionRequest.assignmentId);
+      if (!student || !assignment) {
+        setStudentSessionError("This student session is not available on this device.");
+        setStudentSessionRequest(null);
+        return;
+      }
+      try {
+        openClassroomStudent(student, assignment, assignment.id === defaultClassroomAssignmentId && classroomUpdateStatus === "applied", "student");
+      } catch {
+        setStudentSessionError("The learning path for this student session is unavailable.");
+      }
+      setStudentSessionRequest(null);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [allClassroomStudents, classroomAssignments, classroomUpdateStatus, openClassroomStudent, studentSessionRequest]);
+
+  const launchClassroomStudentSession = (student: ClassroomStudent, assignment: ClassroomAssignment) => {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("view", "student");
+    url.searchParams.set("student", student.id);
+    url.searchParams.set("assignment", assignment.id);
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
+  };
+
+  const closeStudentSession = () => {
+    window.close();
+    window.setTimeout(() => {
+      const url = new URL(window.location.href);
+      url.search = "";
+      window.location.assign(url.toString());
+    }, 120);
   };
 
   const assignClassroomSupportReview = () => {
@@ -871,14 +927,17 @@ export function CurrentWorkspace() {
           </span>
           <button className="icon-action mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button>
         </div>
-        <button className={`track-title ${workspaceView === "map" ? "active" : ""}`} aria-current={workspaceView === "map" ? "page" : undefined} onClick={openLearningMap}>
+        {isStudentSession ? <div className="track-title student-session-track">
+          <span className="track-icon"><BookOpen size={16} /></span>
+          <div><strong>{activePath.title}</strong><small>{activePath.concepts.length} concepts</small></div>
+        </div> : <button className={`track-title ${workspaceView === "map" ? "active" : ""}`} aria-current={workspaceView === "map" ? "page" : undefined} onClick={openLearningMap}>
           <span className="track-icon"><FolderOpen size={16} /></span>
           <div><strong>{activePath.title}</strong><small>{activePath.concepts.length} concepts</small></div>
           <ChevronRight size={14} />
-        </button>
-        <button className="classroom-sidebar-entry" onClick={openClassroom}>
+        </button>}
+        {!isStudentSession ? <button className="classroom-sidebar-entry" onClick={openClassroom}>
           <span><School size={15} /></span><strong>Classroom</strong><ChevronRight size={14} />
-        </button>
+        </button> : null}
 
         <ol className="concept-path">
           {activePath.concepts.map((concept, index) => {
@@ -933,6 +992,7 @@ export function CurrentWorkspace() {
             onCreateAssignment={createClassroomAssignment}
             onOpenLearningMap={openLearningMap}
             onPreviewStudent={openClassroomStudent}
+            onLaunchStudentSession={launchClassroomStudentSession}
             updateStatus={classroomUpdateStatus}
             onSetUpdateStatus={updateClassroomCurriculum}
             supportReviewAssigned={supportReviewAssigned}
@@ -995,13 +1055,13 @@ export function CurrentWorkspace() {
             </div>
 
             {classroomPreviewStudent ? (
-              <div className="classroom-preview-bar" role="status">
-                <span><School size={14} /><strong>Previewing {classroomPreviewStudent.name}</strong><small>{classroomPreviewStudent.interest} context · activity updates the classroom demo</small></span>
-                <button onClick={openClassroom}>Return to Classroom <ArrowRight size={13} /></button>
+              <div className={`classroom-preview-bar ${isStudentSession ? "student-session" : ""}`} role="status">
+                <span><School size={14} /><strong>{isStudentSession ? `${classroomPreviewStudent.name}'s assignment` : `Previewing ${classroomPreviewStudent.name}`}</strong><small>{isStudentSession ? `${classroomPreviewAssignment?.title ?? activePath.title} · your work is saved to this assignment` : `${classroomPreviewStudent.interest} context · activity updates the classroom roster`}</small></span>
+                <button onClick={isStudentSession ? closeStudentSession : openClassroom}>{isStudentSession ? "Close session" : "Return to Classroom"} <ArrowRight size={13} /></button>
               </div>
-            ) : null}
+            ) : studentSessionError ? <div className="classroom-preview-bar classroom-session-error" role="alert"><span><CircleHelp size={14} /><strong>{studentSessionError}</strong></span><button onClick={() => setStudentSessionError("")}>Dismiss</button></div> : null}
 
-            <div className={`lesson-scroll ${classroomPreviewStudent ? "with-classroom-preview" : ""}`} ref={lessonScrollRef}>
+            <div className={`lesson-scroll ${classroomPreviewStudent || studentSessionError ? "with-classroom-preview" : ""}`} ref={lessonScrollRef}>
               <div className="mode-stage">
                 {activePath.userCreated && !activeLesson ? (
                   <LessonGenerationModule state={lessonGeneration?.key === conceptKey ? lessonGeneration : null} retry={retryLessonGeneration} />

@@ -6,6 +6,7 @@ import {
   BookOpenCheck,
   Check,
   CircleAlert,
+  ExternalLink,
   Filter,
   GraduationCap,
   Network,
@@ -37,6 +38,7 @@ type ClassroomWorkspaceProps = {
   onCreateAssignment: (input: NewAssignmentInput) => void;
   onOpenLearningMap: () => void;
   onPreviewStudent: (student: ClassroomStudent, assignment: ClassroomAssignment, curriculumUpdateApplied: boolean) => void;
+  onLaunchStudentSession: (student: ClassroomStudent, assignment: ClassroomAssignment) => void;
   updateStatus: ClassroomUpdateStatus;
   onSetUpdateStatus: (status: ClassroomUpdateStatus) => void;
   supportReviewAssigned: boolean;
@@ -60,7 +62,7 @@ function formatAssignmentDate(value: string) {
   return Number.isNaN(date.getTime()) ? "Unscheduled" : new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
 }
 
-export function ClassroomWorkspace({ classes, assignments, students, activeClass, activeAssignment, assignmentPath, availablePaths, navigation, onNavigationChange, onCreateClass, onCreateAssignment, onOpenLearningMap, onPreviewStudent, updateStatus, onSetUpdateStatus, supportReviewAssigned, onAssignSupportReview }: ClassroomWorkspaceProps) {
+export function ClassroomWorkspace({ classes, assignments, students, activeClass, activeAssignment, assignmentPath, availablePaths, navigation, onNavigationChange, onCreateClass, onCreateAssignment, onOpenLearningMap, onPreviewStudent, onLaunchStudentSession, updateStatus, onSetUpdateStatus, supportReviewAssigned, onAssignSupportReview }: ClassroomWorkspaceProps) {
   const [createClassOpen, setCreateClassOpen] = useState(false);
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
   const { view, selectedStudentId, studentQuery, attentionOnly } = navigation;
@@ -205,7 +207,7 @@ export function ClassroomWorkspace({ classes, assignments, students, activeClass
             <p>{!curriculumUpdateAvailable ? "Current is watching the sources attached to this path. Proposed changes will appear here with their expected impact." : updateStatus === "applied" ? "The revised checkpoint is now part of the assigned path and will enter each student’s next review." : updateStatus === "dismissed" ? "The proposal remains in the audit trail and can be reopened." : "Current has compared the source and prepared the impact. Students still see the teacher-approved version."}</p>
           </section>
         ) : (
-          <StudentInspector student={selectedStudent} conceptCount={assignmentPath?.concepts.length ?? 0} onPreview={() => onPreviewStudent(selectedStudent, activeAssignment, curriculumUpdateAvailable && updateStatus === "applied")} />
+          <StudentInspector student={selectedStudent} conceptCount={assignmentPath?.concepts.length ?? 0} onPreview={() => onPreviewStudent(selectedStudent, activeAssignment, curriculumUpdateAvailable && updateStatus === "applied")} onLaunchSession={() => onLaunchStudentSession(selectedStudent, activeAssignment)} />
         )}
       </aside>
       {createClassOpen ? <CreateClassDialog onClose={() => setCreateClassOpen(false)} onCreate={(input) => { onCreateClass(input); setCreateClassOpen(false); }} /> : null}
@@ -233,7 +235,7 @@ function StudentTable({ students, conceptCount, selectedStudentId, onSelect, emp
   );
 }
 
-function StudentInspector({ student, conceptCount, onPreview }: { student: ClassroomStudent; conceptCount: number; onPreview: () => void }) {
+function StudentInspector({ student, conceptCount, onPreview, onLaunchSession }: { student: ClassroomStudent; conceptCount: number; onPreview: () => void; onLaunchSession: () => void }) {
   return (
     <section className="classroom-student-inspector">
       <span>Selected student</span>
@@ -242,7 +244,10 @@ function StudentInspector({ student, conceptCount, onPreview }: { student: Class
       {typeof student.lastScore === "number" ? <div className="classroom-latest-evidence"><span>Latest recall</span><strong>{student.lastScore}%</strong><small>{student.recallAttempts ?? 1} recorded attempt{student.recallAttempts === 1 ? "" : "s"}</small></div> : null}
       {student.misconception ? <div className="classroom-inspector-gap"><small>Observed gap</small><p>{student.misconception}</p></div> : <div className="classroom-inspector-gap resolved"><small>Latest recall</small><p>No unresolved misconception.</p></div>}
       <div className="classroom-personalization"><span><Sparkles size={13} /> Personalized support</span><strong>{student.support}</strong><p>Interest: {student.interest}. The class objective and scoring rubric remain unchanged.</p></div>
-      <button className="classroom-preview-student" onClick={onPreview}><BookOpenCheck size={14} /> Open student view</button>
+      <div className="classroom-student-actions">
+        <button className="classroom-preview-student" onClick={onPreview}><BookOpenCheck size={14} /> Preview as student</button>
+        <button className="classroom-launch-student" onClick={onLaunchSession}><ExternalLink size={14} /> Launch student session</button>
+      </div>
     </section>
   );
 }
