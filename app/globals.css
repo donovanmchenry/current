@@ -214,6 +214,7 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .module-header h1 { max-width: 650px; margin: 0; color: var(--text); font-size: 31px; line-height: 1.18; font-weight: 500; }
 .module-header > p { max-width: 650px; margin: 15px 0 0; color: var(--text-secondary); font-size: 14px; line-height: 1.7; }
 .module-header code { padding: 2px 4px; border-radius: 4px; background: var(--bg-elevated); font-size: .88em; }
+.generation-provenance { display: block; margin-bottom: 9px; color: var(--text-muted); font-size: 10px; }
 .concept-overview-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; color: var(--text-muted); font-size: 11px; }
 .concept-overview-meta span:first-child { color: var(--accent-bright); }
 .concept-overview-objective { max-width: 650px; padding: 15px 16px; border-radius: 6px; background: #0d0d0d; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); }
@@ -343,6 +344,13 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .map-toolbar-divider { width: 1px; height: 17px; background: #303030; }
 .map-toolbar-title { display: inline-flex; align-items: center; gap: 6px; }
 .map-toolbar-title > svg { color: var(--text-muted); }
+.map-toolbar-end { position: relative; justify-self: end; }
+.map-reset-trigger { min-height: 29px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; padding: 0 8px; color: var(--text-muted); background: transparent; font-size: 10px; cursor: pointer; }
+.map-reset-trigger:hover { color: var(--text-secondary); background: #1b1b1b; }
+.map-reset-confirm { min-height: 34px; display: flex; align-items: center; gap: 5px; border-radius: 7px; padding: 3px 3px 3px 9px; color: var(--text-secondary); background: #1b1b1b; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .08), 0 10px 26px rgba(0,0,0,.28); font-size: 9px; white-space: nowrap; }
+.map-reset-confirm > button:not(.icon-action) { min-height: 26px; display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 5px; padding: 0 8px; color: #111; background: #f2f2f2; font-size: 9px; font-weight: 560; cursor: pointer; }
+.map-reset-confirm .icon-action { width: 26px; height: 26px; }
+.map-reset-confirm button:disabled { opacity: .55; cursor: default; }
 .map-view-switcher { --map-tab-index: 0; position: relative; isolation: isolate; justify-self: center; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; padding: 3px; border-radius: 999px; background: #151515; }
 .map-view-switcher.mode-list { --map-tab-index: 1; }
 .map-view-switcher.mode-updates { --map-tab-index: 2; }
@@ -599,7 +607,8 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .primary-path-action:hover { background: #dcdcdc; }
 .create-path-spinner { animation: create-path-spin 1s linear infinite; }
 .path-preview-heading { padding-top: 3px; }
-.path-preview-heading > span { color: var(--text-muted); font-size: 9px; }
+.path-preview-kicker { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-muted); font-size: 9px; }
+.path-preview-kicker small { color: var(--accent-bright); font-size: 9px; }
 .path-preview-heading h3 { margin: 7px 0 0; font-size: 20px; line-height: 1.25; font-weight: 580; }
 .path-preview-heading p { margin: 8px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
 .path-preview-concepts { display: grid; gap: 4px; margin-top: 18px; }
@@ -690,6 +699,8 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
   .learning-map-shell { display: flex; flex-direction: column; }
   .map-toolbar { flex: 0 0 92px; grid-template-columns: minmax(0, 1fr); grid-template-rows: 38px 38px; gap: 3px; padding: 6px 9px 7px; }
   .map-toolbar-start { grid-column: 1; grid-row: 1; }
+  .map-toolbar-end { grid-column: 1; grid-row: 1; }
+  .map-reset-trigger span { display: none; }
   .map-wordmark { gap: 7px; }
   .map-wordmark strong { display: block; font-size: 13px; }
   .map-toolbar-divider, .map-toolbar-title { display: none; }

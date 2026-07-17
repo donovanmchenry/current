@@ -71,3 +71,15 @@ export async function removeSourceArtifacts(ids: string[]) {
     // Removing a path must still succeed when local file storage is unavailable.
   }
 }
+
+export async function clearSourceArtifacts() {
+  try {
+    const database = await openArtifactDatabase();
+    const transaction = database.transaction(storeName, "readwrite");
+    transaction.objectStore(storeName).clear();
+    await transactionComplete(transaction);
+    database.close();
+  } catch {
+    // Resetting the demo must still succeed when local file storage is unavailable.
+  }
+}

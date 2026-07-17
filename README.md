@@ -41,6 +41,8 @@ The seeded workspace follows **AI agent engineering** and opens directly on **Lo
 
 The lesson remains modular and interactive throughout: concept path on the left, active work in the center, and notes or sources on the right.
 
+To restore the seeded judging state, open the Learning Map and choose **Reset demo**. Current clears custom paths, local source artifacts, notes, reviews, and learned preferences, then returns to the Compaction lesson at Read.
+
 ## GPT-5.6 Sol
 
 The live recall evaluator is implemented in `app/api/coach/route.ts` with the Responses API:
@@ -51,6 +53,8 @@ The live recall evaluator is implemented in `app/api/coach/route.ts` with the Re
 - Task: grade free-form recall of compaction against a narrow, source-backed rubric and identify the missing link
 
 When `OPENAI_API_KEY` is absent or a live call fails, the same endpoint returns a deterministic rubric-based evaluation. This keeps the three-minute demo reproducible while preserving the real GPT-5.6 integration path.
+
+Path previews, generated lessons, recall evaluations, and source-update proposals identify when GPT-5.6 Sol produced the result. Deterministic output is labeled as a demo fallback so the model-backed workflow remains inspectable during judging.
 
 The lesson cites the official [compaction](https://developers.openai.com/api/docs/guides/compaction) and [conversation state](https://developers.openai.com/api/docs/guides/conversation-state) guides.
 

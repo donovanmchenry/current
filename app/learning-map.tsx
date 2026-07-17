@@ -89,6 +89,7 @@ type LearningMapProps = {
   onSetSourceUpdateStatus: (updateId: string, status: SourceUpdateProposal["status"]) => void;
   onSourceChecked: (pathId: string, sourceId: string, snapshot: SourceSnapshot) => void;
   onOpenSource: (source: LearningSource) => void;
+  onResetDemo: () => Promise<void>;
 };
 
 export function LearningMap({
@@ -113,6 +114,7 @@ export function LearningMap({
   onSetSourceUpdateStatus,
   onSourceChecked,
   onOpenSource,
+  onResetDemo,
 }: LearningMapProps) {
   const [mapMode, setMapMode] = useState<MapMode>("map");
   const [mapTransitionDirection, setMapTransitionDirection] = useState<MapTransitionDirection>("forward");
@@ -128,6 +130,8 @@ export function LearningMap({
   const [createPathOpen, setCreatePathOpen] = useState(false);
   const [noteQuery, setNoteQuery] = useState("");
   const [removePathId, setRemovePathId] = useState<string | null>(null);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resettingDemo, setResettingDemo] = useState(false);
   const storageHydratedRef = useRef(false);
   const sourceAgentStartedRef = useRef(false);
 
@@ -208,6 +212,23 @@ export function LearningMap({
     if (nextMode === mapMode) return;
     setMapTransitionDirection(mapModeOrder.indexOf(nextMode) > mapModeOrder.indexOf(mapMode) ? "forward" : "backward");
     setMapMode(nextMode);
+  };
+
+  const resetDemo = async () => {
+    setResettingDemo(true);
+    window.localStorage.removeItem(mapUiStorageKey);
+    window.sessionStorage.removeItem(sourceAgentSessionKey);
+    setMapMode("map");
+    setMapTransitionDirection("backward");
+    setSelectedPathId("long-running");
+    setSelectedConceptIndex(1);
+    setSuggestionStatus("ready");
+    setReviewedUpdateId(null);
+    setSourceRefreshState(null);
+    setCreatePathOpen(false);
+    setNoteQuery("");
+    setRemovePathId(null);
+    await onResetDemo();
   };
 
   const addSuggestedPath = () => {
@@ -311,6 +332,17 @@ export function LearningMap({
           <button role="tab" aria-selected={mapMode === "list"} className={mapMode === "list" ? "active" : ""} onClick={() => switchMapMode("list")}><List size={14} /> List</button>
           <button role="tab" aria-label={pendingUpdates ? `Updates, ${pendingUpdates} pending` : "Updates"} aria-selected={mapMode === "updates"} className={[mapMode === "updates" ? "active" : "", pendingUpdates ? "updates-pending" : ""].filter(Boolean).join(" ")} onClick={() => switchMapMode("updates")}><Activity size={14} aria-hidden="true" /> Updates</button>
           <button role="tab" aria-selected={mapMode === "notes"} className={mapMode === "notes" ? "active" : ""} onClick={() => switchMapMode("notes")}><NotebookPen size={14} /> Notes{noteEntries.length ? <span className="updates-tab-count">{noteEntries.length}</span> : null}</button>
+        </div>
+        <div className="map-toolbar-end">
+          {resetConfirmOpen ? (
+            <div className="map-reset-confirm" role="group" aria-label="Confirm demo reset">
+              <span>Reset demo?</span>
+              <button disabled={resettingDemo} onClick={resetDemo}>{resettingDemo ? <RefreshCw className="spinning" size={12} /> : null}{resettingDemo ? "Resetting" : "Reset"}</button>
+              <button className="icon-action" aria-label="Cancel demo reset" disabled={resettingDemo} onClick={() => setResetConfirmOpen(false)}><X size={14} /></button>
+            </div>
+          ) : (
+            <button className="map-reset-trigger" onClick={() => setResetConfirmOpen(true)}><RotateCcw size={13} /><span>Reset demo</span></button>
+          )}
         </div>
       </div>
 
