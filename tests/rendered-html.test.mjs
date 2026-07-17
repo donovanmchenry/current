@@ -257,6 +257,7 @@ test("connects the lesson shell to a functional learning map", async () => {
 test("connects Current Classroom to the adaptive learner runtime", async () => {
   const workspace = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
   const classroom = await readFile(new URL("../app/classroom-workspace.tsx", import.meta.url), "utf8");
+  const dialogs = await readFile(new URL("../app/classroom-create-dialogs.tsx", import.meta.url), "utf8");
   const catalog = await readFile(new URL("../lib/classroom-catalog.ts", import.meta.url), "utf8");
   const map = await readFile(new URL("../app/learning-map.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
@@ -264,7 +265,9 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(workspace, /type WorkspaceView = "lesson" \| "map" \| "classroom"/);
   assert.match(workspace, /className="classroom-sidebar-entry"[\s\S]*onClick=\{openClassroom\}/);
   assert.match(workspace, /<ClassroomWorkspace[\s\S]*onOpenLearningMap=\{openLearningMap\}[\s\S]*onPreviewStudent=\{openClassroomStudent\}[\s\S]*updateStatus=\{classroomUpdateStatus\}/);
-  assert.match(workspace, /classroomPathForStudent\(student, curriculumUpdateApplied\)[\s\S]*setCustomPaths[\s\S]*setWorkspaceView\("lesson"\)/);
+  assert.match(workspace, /classroomPathForAssignment\(student, assignment, sourcePath, curriculumUpdateApplied\)[\s\S]*setCustomPaths[\s\S]*setWorkspaceView\("lesson"\)/);
+  assert.match(workspace, /const createClassroomClass = \(input: NewClassInput\)/);
+  assert.match(workspace, /const createClassroomAssignment = \(input: NewAssignmentInput\)/);
   assert.match(workspace, /onOpenClassroom=\{openClassroom\}/);
   assert.match(map, /onOpenClassroom: \(\) => void/);
   assert.match(map, /className="map-classroom-link" onClick=\{onOpenClassroom\}/);
@@ -278,11 +281,16 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(classroom, /Approve update/);
   assert.match(classroom, /Current proposes changes\. Teachers decide what reaches students\./);
   assert.match(classroom, /Open student view/);
-  assert.match(classroom, /onPreviewStudent\(selectedStudent, updateStatus === "applied"\)/);
-  assert.match(classroom, /Assign slope review/);
+  assert.match(classroom, /onPreviewStudent\(selectedStudent, activeAssignment, curriculumUpdateAvailable && updateStatus === "applied"\)/);
+  assert.match(classroom, /Assign targeted review/);
+  assert.match(classroom, /CreateClassDialog/);
+  assert.match(classroom, /CreateAssignmentDialog/);
+  assert.match(dialogs, /One student per line/);
+  assert.match(dialogs, /Assign a learning path/);
   assert.match(classroom, /Latest recall/);
   assert.match(catalog, /export function classroomPathForStudent/);
-  assert.match(catalog, /id: classroomPathId\(student\.id\)/);
+  assert.match(catalog, /export function classroomPathForAssignment/);
+  assert.match(catalog, /id: classroomPathId\(student\.id, assignment\.id\)/);
   assert.match(catalog, /export function classroomEvidenceAfterRecall/);
   assert.match(catalog, /curriculumUpdateApplied[\s\S]*Compare slope and intercept across tables, graphs, equations, and verbal descriptions/);
   assert.match(catalog, /Personalized context does not change the class objective/);
@@ -296,6 +304,8 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(styles, /\.classroom-roster > header, \.classroom-roster > button[^}]*grid-template-columns/s);
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.classroom-shell[^}]*flex-direction:\s*column/s);
   assert.match(styles, /\.classroom-preview-bar[^}]*top:\s*54px/s);
+  assert.match(styles, /\.classroom-dialog-overlay[^}]*backdrop-filter:\s*blur\(8px\)/s);
+  assert.match(styles, /\.classroom-mobile-management[^}]*display:\s*grid/s);
   assert.match(workspace, /Previewing \{classroomPreviewStudent\.name\}/);
   assert.match(workspace, /classroomUpdateStatus,[\s\S]*classroomNavigation,[\s\S]*classroomStudentEvidence/);
   assert.match(workspace, /classroom-curriculum-review-/);

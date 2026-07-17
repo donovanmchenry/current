@@ -38,22 +38,51 @@ export type ClassroomNavigationState = {
   selectedStudentId: string;
   studentQuery: string;
   attentionOnly: boolean;
+  activeClassId: string;
+  activeAssignmentId: string;
 };
+
+export type ClassroomClass = {
+  id: string;
+  name: string;
+  section: string;
+  studentIds: string[];
+  createdAt: string;
+};
+
+export type ClassroomAssignment = {
+  id: string;
+  classId: string;
+  pathId: string;
+  title: string;
+  objective: string;
+  dueAt: string;
+  createdAt: string;
+};
+
+export const defaultClassroomId = "algebra-i-period-2";
+export const defaultClassroomAssignmentId = "algebra-1-linear-relationships";
 
 export const defaultClassroomNavigation: ClassroomNavigationState = {
   view: "overview",
   selectedStudentId: "jordan-brooks",
   studentQuery: "",
   attentionOnly: false,
+  activeClassId: defaultClassroomId,
+  activeAssignmentId: defaultClassroomAssignmentId,
 };
 
-export function classroomPathId(studentId: string) {
-  return `classroom-linear-relationships-${studentId}`;
+export function classroomEvidenceKey(assignmentId: string, studentId: string) {
+  return `${assignmentId}:${studentId}`;
 }
 
-export function classroomStudentsWithEvidence(evidence: Record<string, ClassroomStudentEvidence>) {
-  return classroomStudents.map((student) => {
-    const latest = evidence[student.id];
+export function classroomPathId(studentId: string, assignmentId = defaultClassroomAssignmentId) {
+  return `classroom-${assignmentId}-${studentId}`;
+}
+
+export function classroomStudentsWithEvidence(students: ClassroomStudent[], evidence: Record<string, ClassroomStudentEvidence>, assignmentId: string) {
+  return students.map((student) => {
+    const latest = evidence[classroomEvidenceKey(assignmentId, student.id)];
     return latest ? { ...student, ...latest } : student;
   });
 }
@@ -208,9 +237,47 @@ export const classroomStudents: ClassroomStudent[] = [
   },
 ];
 
+export const defaultClassroomClasses: ClassroomClass[] = [{
+  id: defaultClassroomId,
+  name: "Algebra I",
+  section: "Period 2",
+  studentIds: classroomStudents.map((student) => student.id),
+  createdAt: "2026-07-17T00:00:00.000Z",
+}];
+
+export const defaultClassroomAssignments: ClassroomAssignment[] = [{
+  id: defaultClassroomAssignmentId,
+  classId: defaultClassroomId,
+  pathId: "classroom-linear-template",
+  title: "Linear relationships",
+  objective: "Interpret slope and intercept in real contexts, then compare equations, tables, and graphs.",
+  dueAt: "2026-07-24T23:59:00.000Z",
+  createdAt: "2026-07-17T00:00:00.000Z",
+}];
+
+export function classroomStudentFromInput(id: string, name: string, interest: string): ClassroomStudent {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "ST";
+  return {
+    id,
+    name,
+    initials,
+    interest,
+    mastery: 0,
+    completedConcepts: 0,
+    status: "on_track",
+    lastActive: "Not started",
+    misconception: null,
+    support: `${interest} examples with explicit reasoning steps`,
+    example: `A worked example connected to ${interest.toLowerCase()} can make the quantities and relationships concrete without changing the objective.`,
+    applicationPrompt: `Which explanation best applies the concept in a ${interest.toLowerCase()} context?`,
+    applicationOptions: ["The first explanation", "The source-grounded explanation", "The unsupported shortcut", "None of these"],
+    applicationCorrectIndex: 1,
+  };
+}
+
 export function classroomPathForStudent(student: ClassroomStudent, curriculumUpdateApplied = false): LearningPath {
   return {
-    id: classroomPathId(student.id),
+    id: classroomPathId(student.id, defaultClassroomAssignmentId),
     title: "Linear relationships",
     description: `Assigned in Algebra I and adapted with ${student.interest.toLowerCase()} contexts for ${student.name}.`,
     progress: student.mastery,
@@ -219,7 +286,7 @@ export function classroomPathForStudent(student: ClassroomStudent, curriculumUpd
     relatedPathId: null,
     userCreated: true,
     classroomStudentId: student.id,
-    classroomAssignmentId: "algebra-1-linear-relationships",
+    classroomAssignmentId: defaultClassroomAssignmentId,
     createdAt: "2026-07-17T00:00:00.000Z",
     sources: [
       {
@@ -291,5 +358,31 @@ export function classroomPathForStudent(student: ClassroomStudent, curriculumUpd
         sourceIds: ["ccss-8-ee-b-5"],
       },
     ],
+  };
+}
+
+export function classroomPathForAssignment(
+  student: ClassroomStudent,
+  assignment: ClassroomAssignment,
+  sourcePath: LearningPath | undefined,
+  curriculumUpdateApplied = false,
+): LearningPath {
+  if (assignment.id === defaultClassroomAssignmentId) return classroomPathForStudent(student, curriculumUpdateApplied);
+  if (!sourcePath) throw new Error("The assigned learning path is unavailable.");
+  return {
+    ...sourcePath,
+    id: classroomPathId(student.id, assignment.id),
+    title: assignment.title,
+    description: `${sourcePath.description} Assigned in class for ${student.name}; adapt examples around ${student.interest.toLowerCase()} while preserving the source, objective, and rubric.`,
+    progress: 0,
+    next: sourcePath.concepts[0]?.title ?? "Start",
+    status: "Assigned by teacher",
+    relatedPathId: sourcePath.id,
+    userCreated: true,
+    createdAt: assignment.createdAt,
+    classroomStudentId: student.id,
+    classroomAssignmentId: assignment.id,
+    sources: sourcePath.sources?.map((source) => ({ ...source })),
+    concepts: sourcePath.concepts.map((concept) => ({ ...concept, lesson: undefined })),
   };
 }

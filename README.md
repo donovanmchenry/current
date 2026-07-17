@@ -41,7 +41,7 @@ The learner stays in control. Sources remain visible. Model decisions are labele
 - **Concept-level memory.** Current remembers misconceptions, successful support modes, attempts, progress, notes, and reflections by concept.
 - **Spaced review.** Clean recall earns a longer interval; concepts that needed help return sooner.
 - **Living curricula.** A research agent compares stored and current source evidence, shows the diff, identifies affected concepts, and waits for approval.
-- **Current Classroom.** Teachers can turn a class misconception into targeted review, preview the exact interest-aware student experience, see recall evidence return to the roster, and approve curriculum updates before they reach the class.
+- **Current Classroom.** Teachers can create rostered classes, assign any Current path with a due date, preview each interest-aware student experience, turn shared misconceptions into targeted review, and approve curriculum updates before they reach the class.
 - **Reopenable sources.** Uploaded artifacts persist locally and can be viewed or downloaded from the workspace.
 - **A real reset button.** Judges can restore the seeded state in one click. Demo reliability is a product feature too.
 
@@ -171,13 +171,13 @@ npm run lint
 npm test
 ```
 
-The current suite contains 24 passing tests. `npm test` builds the production application before running endpoint, scheduler, persistence, Classroom, and rendered-behavior checks.
+The current suite contains 29 passing tests. `npm test` builds the production application before running endpoint, scheduler, persistence, Classroom, and rendered-behavior checks.
 
 ## Status
 
 Build Week MVP: complete. Hosted product: [current-learning-lab.vanzm.chatgpt.site](https://current-learning-lab.vanzm.chatgpt.site). No account or credentials are required.
 
-Next: class creation, reusable assignments, learner profiles, durable cloud sync, and teacher-managed rosters. See [`ROADMAP.md`](./ROADMAP.md).
+Next: learner profiles, durable cloud sync, teacher-authored constraints, and classroom pilots with educators. See [`ROADMAP.md`](./ROADMAP.md).
 
 ## License
 

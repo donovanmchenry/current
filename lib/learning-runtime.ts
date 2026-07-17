@@ -1,5 +1,5 @@
 import type { LearningPath, SourceSnapshot, SourceUpdateProposal } from "./learning-path";
-import type { ClassroomNavigationState, ClassroomStudentEvidence } from "./classroom-catalog";
+import type { ClassroomAssignment, ClassroomClass, ClassroomNavigationState, ClassroomStudent, ClassroomStudentEvidence } from "./classroom-catalog";
 import type { ReviewMemory } from "./spaced-review";
 
 export type PathProgress = {
@@ -43,6 +43,9 @@ export type LearningRuntimeSnapshot = {
   classroomUpdateStatus?: "ready" | "applied" | "dismissed";
   classroomNavigation?: ClassroomNavigationState;
   classroomStudentEvidence?: Record<string, ClassroomStudentEvidence>;
+  classroomClasses?: ClassroomClass[];
+  classroomAssignments?: ClassroomAssignment[];
+  classroomCustomStudents?: ClassroomStudent[];
 };
 
 export type CheckedSourceSnapshot = {

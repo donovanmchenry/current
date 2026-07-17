@@ -704,10 +704,16 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .classroom-back { min-height: 32px; display: inline-flex; align-items: center; align-self: start; gap: 6px; border: 0; border-radius: 7px; padding: 0 8px; color: var(--text-muted); background: transparent; font-size: 10px; cursor: pointer; }
 .classroom-back:hover { color: var(--text); background: #181818; }
 .classroom-class-title { padding: 18px 10px 15px; }
-.classroom-class-title span, .classroom-class-title strong, .classroom-class-title small { display: block; }
-.classroom-class-title span { color: var(--text-muted); font-size: 10px; }
-.classroom-class-title strong { margin-top: 4px; color: var(--text); font-size: 16px; font-weight: 560; }
-.classroom-class-title small { margin-top: 4px; color: var(--text-muted); font-size: 10px; }
+.classroom-class-title > div { display: grid; grid-template-columns: minmax(0, 1fr) 28px; align-items: end; gap: 5px; margin-bottom: 14px; }
+.classroom-class-title label { min-width: 0; display: grid; gap: 5px; }
+.classroom-class-title label > span { display: block; color: var(--text-muted); font-size: 8px; }
+.classroom-class-title select { width: 100%; height: 29px; min-width: 0; border: 0; border-radius: 6px; outline: 0; padding: 0 25px 0 8px; color: var(--text-secondary); background: #171717; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); font: inherit; font-size: 9px; cursor: pointer; }
+.classroom-class-title > div > button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 6px; color: var(--text-muted); background: #171717; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); cursor: pointer; }
+.classroom-class-title > div > button:hover { color: var(--text); background: #202020; }
+.classroom-class-title > strong, .classroom-class-title > span, .classroom-class-title > small { display: block; }
+.classroom-class-title > span { margin-top: 3px; color: var(--text-secondary); font-size: 10px; }
+.classroom-class-title > strong { color: var(--text); font-size: 16px; font-weight: 560; }
+.classroom-class-title > small { margin-top: 5px; color: var(--text-muted); font-size: 9px; }
 .classroom-sidebar nav { display: grid; gap: 2px; }
 .classroom-sidebar nav button { min-height: 37px; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 7px; border: 0; border-radius: 7px; padding: 0 10px; color: var(--text-muted); background: transparent; text-align: left; font-size: 11px; cursor: pointer; }
 .classroom-sidebar nav button:hover { color: var(--text-secondary); background: #151515; }
@@ -717,12 +723,22 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .classroom-assignment-nav > span { display: block; padding: 0 6px 7px; color: var(--text-muted); font-size: 9px; }
 .classroom-assignment-nav > button { width: 100%; min-height: 48px; display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 7px; border: 0; border-radius: 8px; padding: 7px 9px; color: var(--text-secondary); background: #121212; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .06); text-align: left; cursor: pointer; }
 .classroom-assignment-nav > button:hover { color: var(--text); background: #171717; }
+.classroom-assignment-nav > button.active { color: var(--text); background: #1b1b1b; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .1); }
 .classroom-assignment-nav strong, .classroom-assignment-nav small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .classroom-assignment-nav strong { font-size: 10px; font-weight: 550; }
 .classroom-assignment-nav small { margin-top: 3px; color: var(--text-muted); font-size: 8px; }
+.classroom-assignment-nav > button + button { margin-top: 5px; }
+.classroom-assignment-nav > .classroom-new-assignment { min-height: 32px; display: flex; justify-content: center; gap: 6px; color: var(--text-muted); background: transparent; box-shadow: none; }
+.classroom-assignment-nav > .classroom-new-assignment:hover { color: var(--text); background: #151515; }
 
 .classroom-main { min-width: 0; min-height: 0; grid-column: 2; grid-row: 2; overflow-y: auto; background: #050505; }
+.classroom-mobile-management { display: none; }
 .classroom-view { width: min(920px, calc(100% - 48px)); margin: 0 auto; padding: 38px 0 72px; }
+.classroom-empty-assignment { min-height: 100%; display: grid; place-content: center; justify-items: center; text-align: center; }
+.classroom-empty-assignment > svg { color: var(--text-muted); }
+.classroom-empty-assignment h1 { margin: 14px 0 0; color: var(--text); font-size: 20px; font-weight: 560; }
+.classroom-empty-assignment p { max-width: 470px; margin: 8px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+.classroom-empty-assignment button { min-height: 33px; display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; border: 0; border-radius: 7px; padding: 0 11px; color: #111; background: #f2f2f2; font-size: 10px; font-weight: 560; cursor: pointer; }
 .classroom-page-heading { min-height: 48px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
 .classroom-page-heading h1 { margin: 0; color: var(--text); font-size: 25px; line-height: 1.2; font-weight: 560; }
 .classroom-page-heading p { margin: 7px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
@@ -833,6 +849,44 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .classroom-update-inspector > svg { margin-top: 25px; color: var(--accent-bright); }
 .classroom-update-inspector h2 { margin: 13px 0 0; color: var(--text); font-size: 15px; line-height: 1.4; font-weight: 560; }
 .classroom-update-inspector p { margin: 8px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.6; }
+.classroom-no-updates { min-height: 260px; display: grid; place-content: center; justify-items: center; margin-top: 26px; color: var(--text-muted); text-align: center; }
+.classroom-no-updates strong { margin-top: 12px; color: var(--text-secondary); font-size: 12px; font-weight: 550; }
+.classroom-no-updates p { max-width: 440px; margin: 7px 0 0; font-size: 10px; line-height: 1.55; }
+
+.classroom-dialog-overlay { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .72); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.classroom-dialog { width: min(560px, 100%); max-height: min(720px, calc(100vh - 40px)); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border-radius: 8px; color: var(--text); background: #101010; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .1), 0 28px 70px rgba(0, 0, 0, .5); }
+.classroom-dialog > header { min-height: 61px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 18px; box-shadow: inset 0 -1px 0 hsl(var(--foreground) / .07); }
+.classroom-dialog > header > div { display: flex; align-items: center; gap: 10px; }
+.classroom-dialog > header > div > svg { color: var(--text-muted); }
+.classroom-dialog > header span, .classroom-dialog > header strong, .classroom-dialog > header small { display: block; }
+.classroom-dialog > header strong { font-size: 13px; font-weight: 560; }
+.classroom-dialog > header small { margin-top: 3px; color: var(--text-muted); font-size: 9px; }
+.classroom-dialog > header > button { width: 29px; height: 29px; display: grid; place-items: center; border: 0; border-radius: 6px; color: var(--text-muted); background: transparent; cursor: pointer; }
+.classroom-dialog > header > button:hover { color: var(--text); background: #222; }
+.classroom-dialog-body { overflow-y: auto; padding: 19px; }
+.classroom-dialog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.classroom-dialog-body label { display: grid; gap: 7px; color: var(--text-secondary); font-size: 9px; }
+.classroom-dialog-body label > small { margin-top: -3px; color: var(--text-muted); font-size: 8px; line-height: 1.4; }
+.classroom-dialog-body input, .classroom-dialog-body select, .classroom-dialog-body textarea { width: 100%; border: 0; border-radius: 7px; outline: 0; padding: 0 11px; color: var(--text); background: #1b1b1b; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .08); font: inherit; font-size: 10px; }
+.classroom-dialog-body input:focus, .classroom-dialog-body select:focus, .classroom-dialog-body textarea:focus { box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .2); }
+.classroom-dialog-body input, .classroom-dialog-body select { height: 36px; }
+.classroom-roster-input { margin-top: 15px; }
+.classroom-dialog-body textarea { min-height: 150px; resize: vertical; padding-block: 10px; line-height: 1.55; }
+.classroom-sample-roster { min-height: 28px; display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; border: 0; border-radius: 6px; padding: 0 8px; color: var(--text-muted); background: transparent; font-size: 8px; cursor: pointer; }
+.classroom-sample-roster:hover { color: var(--text-secondary); background: #1b1b1b; }
+.classroom-dialog-error { margin: 10px 0 0; color: #ef8f8f; font-size: 9px; }
+.classroom-dialog > footer { min-height: 57px; display: flex; align-items: center; justify-content: flex-end; gap: 7px; padding: 0 18px; box-shadow: inset 0 1px 0 hsl(var(--foreground) / .07); }
+.classroom-dialog > footer button { min-height: 31px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; padding: 0 10px; color: var(--text-secondary); background: #252525; font-size: 9px; cursor: pointer; }
+.classroom-dialog > footer button:last-child { color: #111; background: #f2f2f2; font-weight: 560; }
+.classroom-dialog > footer button:disabled { color: #666; background: #202020; cursor: default; }
+.classroom-assignment-preview { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 9px; margin: 13px 0 16px; border-radius: 7px; padding: 13px; background: #181818; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .065); }
+.classroom-assignment-preview > svg { margin-top: 2px; color: var(--text-muted); }
+.classroom-assignment-preview strong { font-size: 11px; font-weight: 550; }
+.classroom-assignment-preview p { margin: 5px 0 0; color: var(--text-muted); font-size: 9px; line-height: 1.5; }
+.classroom-assignment-preview small { display: block; margin-top: 9px; color: var(--text-secondary); font-size: 8px; }
+.classroom-date-input { position: relative; }
+.classroom-date-input > svg { position: absolute; z-index: 1; top: 11px; left: 10px; color: var(--text-muted); pointer-events: none; }
+.classroom-date-input input { padding-left: 31px; }
 
 @media (max-width: 1100px) {
   :root { --notebook: 300px; }
@@ -946,6 +1000,9 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
   .classroom-view-switcher button { min-width: 0; flex: 1; }
   .classroom-sidebar { display: none; }
   .classroom-main { flex: none; overflow: visible; }
+  .classroom-mobile-management { width: calc(100% - 20px); min-height: 42px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px; margin: 10px auto 0; padding: 5px; border-radius: 8px; background: #111; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .06); }
+  .classroom-mobile-management select { min-width: 0; height: 31px; border: 0; outline: 0; padding: 0 7px; color: var(--text-secondary); background: transparent; font: inherit; font-size: 9px; }
+  .classroom-mobile-management button { min-height: 31px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 6px; padding: 0 8px; color: var(--text-secondary); background: #202020; font-size: 9px; }
   .classroom-view { width: calc(100% - 30px); padding: 28px 0 42px; }
   .classroom-page-heading { align-items: start; }
   .classroom-page-heading h1 { font-size: 22px; }
@@ -967,6 +1024,9 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
   .classroom-preview-bar { padding-inline: 10px; }
   .classroom-preview-bar small { display: none; }
   .classroom-preview-bar button { width: 29px; justify-content: center; overflow: hidden; padding: 0; font-size: 0; }
+  .classroom-dialog-overlay { align-items: end; padding: 8px; }
+  .classroom-dialog { width: 100%; max-height: calc(100dvh - 16px); }
+  .classroom-dialog-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -27,11 +27,19 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   classroomPathForStudent,
+  classroomPathForAssignment,
   classroomPathId,
+  classroomEvidenceKey,
   classroomEvidenceAfterRecall,
   classroomStudents,
   classroomStudentsWithEvidence,
+  classroomStudentFromInput,
+  defaultClassroomAssignments,
+  defaultClassroomClasses,
+  defaultClassroomAssignmentId,
   defaultClassroomNavigation,
+  type ClassroomAssignment,
+  type ClassroomClass,
   type ClassroomNavigationState,
   type ClassroomStudent,
   type ClassroomStudentEvidence,
@@ -61,6 +69,7 @@ import {
 import { scheduleReview } from "../lib/spaced-review";
 import { clearSourceArtifacts, removeSourceArtifacts } from "../lib/source-artifacts";
 import { ClassroomWorkspace, type ClassroomUpdateStatus } from "./classroom-workspace";
+import type { NewAssignmentInput, NewClassInput } from "./classroom-create-dialogs";
 import { LearningMap } from "./learning-map";
 import { SourceArtifactDialog } from "./source-artifact-dialog";
 
@@ -90,6 +99,10 @@ const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
 ];
 
 const runtimeStorageKey = "current-learning-runtime-v1";
+
+function slugifyClassroomValue(value: string) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "classroom";
+}
 
 function applyResearchRevision(paths: LearningPath[], applied: boolean) {
   if (!applied) return paths;
@@ -187,7 +200,10 @@ export function CurrentWorkspace() {
   const [classroomUpdateStatus, setClassroomUpdateStatus] = useState<ClassroomUpdateStatus>("ready");
   const [classroomNavigation, setClassroomNavigation] = useState<ClassroomNavigationState>(defaultClassroomNavigation);
   const [classroomStudentEvidence, setClassroomStudentEvidence] = useState<Record<string, ClassroomStudentEvidence>>({});
-  const [classroomPreviewStudentId, setClassroomPreviewStudentId] = useState<string | null>(null);
+  const [classroomClasses, setClassroomClasses] = useState<ClassroomClass[]>(defaultClassroomClasses);
+  const [classroomAssignments, setClassroomAssignments] = useState<ClassroomAssignment[]>(defaultClassroomAssignments);
+  const [classroomCustomStudents, setClassroomCustomStudents] = useState<ClassroomStudent[]>([]);
+  const [classroomPreview, setClassroomPreview] = useState<{ studentId: string; assignmentId: string } | null>(null);
   const hydrated = useRef(false);
   const lessonScrollRef = useRef<HTMLDivElement>(null);
   const lessonRequestKey = useRef<string | null>(null);
@@ -215,9 +231,19 @@ export function CurrentWorkspace() {
   const isCompactionLesson = activePath.id === "long-running" && safeConceptIndex === 1;
   const activeNoteExcerpt = activeConcept.sourceNote ?? activeConcept.objective;
   const highlighted = isCompactionLesson && notes.includes(activeNoteExcerpt);
-  const classroomRoster = useMemo(() => classroomStudentsWithEvidence(classroomStudentEvidence), [classroomStudentEvidence]);
-  const classroomPreviewStudent = classroomPreviewStudentId ? classroomRoster.find((student) => student.id === classroomPreviewStudentId) ?? null : null;
-  const supportReviewAssigned = reviews.some((review) => review.id.startsWith("classroom-support-review-"));
+  const allClassroomStudents = useMemo(() => [...classroomStudents, ...classroomCustomStudents], [classroomCustomStudents]);
+  const activeClassroomClass = classroomClasses.find((item) => item.id === classroomNavigation.activeClassId) ?? classroomClasses[0];
+  const activeClassroomAssignment = classroomAssignments.find((item) => item.id === classroomNavigation.activeAssignmentId && item.classId === activeClassroomClass.id)
+    ?? classroomAssignments.find((item) => item.classId === activeClassroomClass.id)
+    ?? null;
+  const activeClassroomStudents = activeClassroomClass.studentIds.map((studentId) => allClassroomStudents.find((student) => student.id === studentId)).filter((student): student is ClassroomStudent => Boolean(student));
+  const classroomRoster = useMemo(() => classroomStudentsWithEvidence(activeClassroomStudents, classroomStudentEvidence, activeClassroomAssignment?.id ?? "unassigned"), [activeClassroomAssignment?.id, activeClassroomStudents, classroomStudentEvidence]);
+  const classroomPreviewStudent = classroomPreview ? allClassroomStudents.find((student) => student.id === classroomPreview.studentId) ?? null : null;
+  const classroomAvailablePaths = paths.filter((path) => !path.classroomStudentId);
+  const activeClassroomAssignmentPath = activeClassroomAssignment?.id === defaultClassroomAssignmentId
+    ? classroomPathForStudent(classroomRoster[0] ?? classroomStudents[0], classroomUpdateStatus === "applied")
+    : paths.find((path) => path.id === activeClassroomAssignment?.pathId) ?? null;
+  const supportReviewAssigned = activeClassroomAssignment ? reviews.some((review) => review.id.startsWith(`classroom-support-review-${activeClassroomAssignment.id}-`)) : false;
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -242,6 +268,9 @@ export function CurrentWorkspace() {
           if (saved.classroomUpdateStatus === "ready" || saved.classroomUpdateStatus === "applied" || saved.classroomUpdateStatus === "dismissed") setClassroomUpdateStatus(saved.classroomUpdateStatus);
           if (saved.classroomNavigation) setClassroomNavigation(sanitizeClassroomNavigation(saved.classroomNavigation));
           if (saved.classroomStudentEvidence) setClassroomStudentEvidence(sanitizeClassroomEvidence(saved.classroomStudentEvidence));
+          if (Array.isArray(saved.classroomClasses)) setClassroomClasses(sanitizeClassroomClasses(saved.classroomClasses));
+          if (Array.isArray(saved.classroomAssignments)) setClassroomAssignments(sanitizeClassroomAssignments(saved.classroomAssignments));
+          if (Array.isArray(saved.classroomCustomStudents)) setClassroomCustomStudents(sanitizeClassroomStudents(saved.classroomCustomStudents));
         } else {
           const oldNotes = window.localStorage.getItem("current-notebook-v2") ?? "";
           const oldReflection = window.localStorage.getItem("current-reflection-v1") ?? "";
@@ -282,9 +311,12 @@ export function CurrentWorkspace() {
       classroomUpdateStatus,
       classroomNavigation,
       classroomStudentEvidence,
+      classroomClasses,
+      classroomAssignments,
+      classroomCustomStudents,
     };
     window.localStorage.setItem(runtimeStorageKey, JSON.stringify(snapshot));
-  }, [activePath.id, checkedSources, classroomNavigation, classroomStudentEvidence, classroomUpdateStatus, conceptMemories, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, sourceUpdates, suggestedPathAdded]);
+  }, [activePath.id, checkedSources, classroomAssignments, classroomClasses, classroomCustomStudents, classroomNavigation, classroomStudentEvidence, classroomUpdateStatus, conceptMemories, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, sourceUpdates, suggestedPathAdded]);
 
   useEffect(() => {
     if (workspaceView !== "lesson" || !activePath.userCreated || activeLesson) return;
@@ -346,14 +378,15 @@ export function CurrentWorkspace() {
   };
 
   const recordClassroomAttempt = (result: Evaluation) => {
-    if (!classroomPreviewStudentId) return;
-    const student = classroomStudents.find((candidate) => candidate.id === classroomPreviewStudentId);
+    if (!classroomPreview) return;
+    const student = allClassroomStudents.find((candidate) => candidate.id === classroomPreview.studentId);
     if (!student) return;
+    const evidenceKey = classroomEvidenceKey(classroomPreview.assignmentId, student.id);
     setClassroomStudentEvidence((current) => {
-      const previous = current[student.id];
+      const previous = current[evidenceKey];
       return {
         ...current,
-        [student.id]: classroomEvidenceAfterRecall(student, previous, result),
+        [evidenceKey]: classroomEvidenceAfterRecall(student, previous, result),
       };
     });
   };
@@ -500,7 +533,7 @@ export function CurrentWorkspace() {
     setSourcesOpen(false);
     setSidebarOpen(false);
     setActiveReviewId(null);
-    setClassroomPreviewStudentId(null);
+    setClassroomPreview(null);
     setWorkspaceView("map");
   };
 
@@ -509,7 +542,7 @@ export function CurrentWorkspace() {
     setSourcesOpen(false);
     setSidebarOpen(false);
     setActiveReviewId(null);
-    setClassroomPreviewStudentId(null);
+    setClassroomPreview(null);
     setWorkspaceView("classroom");
   };
 
@@ -540,8 +573,9 @@ export function CurrentWorkspace() {
     setLessonRetryToken((current) => current + 1);
   };
 
-  const openClassroomStudent = (student: ClassroomStudent, curriculumUpdateApplied: boolean) => {
-    const path = classroomPathForStudent(student, curriculumUpdateApplied);
+  const openClassroomStudent = (student: ClassroomStudent, assignment: ClassroomAssignment, curriculumUpdateApplied: boolean) => {
+    const sourcePath = classroomAvailablePaths.find((candidate) => candidate.id === assignment.pathId);
+    const path = classroomPathForAssignment(student, assignment, sourcePath, curriculumUpdateApplied);
     setCustomPaths((current) => [...current.filter((item) => item.id !== path.id), path]);
     setProgress((current) => ({
       ...current,
@@ -549,7 +583,7 @@ export function CurrentWorkspace() {
     }));
     setActivePathId(path.id);
     setActiveConceptIndex(0);
-    setClassroomPreviewStudentId(student.id);
+    setClassroomPreview({ studentId: student.id, assignmentId: assignment.id });
     resetLessonActivity("read");
     setSourcesOpen(false);
     setNotebookOpen(false);
@@ -559,38 +593,104 @@ export function CurrentWorkspace() {
   };
 
   const assignClassroomSupportReview = () => {
+    if (!activeClassroomAssignment) return;
     const dueAt = new Date().toISOString();
-    const assigned = classroomRoster.filter((student) => student.status === "needs_support").map((student) => ({
-      id: `classroom-support-review-${student.id}`,
-      pathId: classroomPathId(student.id),
+    const supportStudents = classroomRoster.filter((student) => student.status === "needs_support");
+    const sourcePath = classroomAvailablePaths.find((path) => path.id === activeClassroomAssignment.pathId);
+    const reviewPaths = supportStudents.map((student) => classroomPathForAssignment(
+      student,
+      activeClassroomAssignment,
+      sourcePath,
+      activeClassroomAssignment.id === defaultClassroomAssignmentId && classroomUpdateStatus === "applied",
+    ));
+    const reviewPathIds = new Set(reviewPaths.map((path) => path.id));
+    setCustomPaths((current) => [...current.filter((path) => !reviewPathIds.has(path.id)), ...reviewPaths]);
+    const assigned = supportStudents.map((student) => ({
+      id: `classroom-support-review-${activeClassroomAssignment.id}-${student.id}`,
+      pathId: classroomPathId(student.id, activeClassroomAssignment.id),
       conceptIndex: 0,
       dueAt,
       memory: { intervalDays: 1, ease: 2.5, repetitions: 0 },
       reason: "research" as const,
     }));
-    setReviews((current) => [...current.filter((review) => !review.id.startsWith("classroom-support-review-")), ...assigned]);
+    const reviewPrefix = `classroom-support-review-${activeClassroomAssignment.id}-`;
+    setReviews((current) => [...current.filter((review) => !review.id.startsWith(reviewPrefix)), ...assigned]);
   };
 
   const updateClassroomCurriculum = (status: ClassroomUpdateStatus) => {
     setClassroomUpdateStatus(status);
-    setCustomPaths((current) => current.map((path) => {
-      if (!path.classroomStudentId) return path;
-      const student = classroomRoster.find((candidate) => candidate.id === path.classroomStudentId);
-      return student ? classroomPathForStudent(student, status === "applied") : path;
-    }));
+    setCustomPaths((current) => {
+      const updated = current.map((path) => {
+        if (!path.classroomStudentId || path.classroomAssignmentId !== defaultClassroomAssignmentId) return path;
+        const student = allClassroomStudents.find((candidate) => candidate.id === path.classroomStudentId);
+        return student ? classroomPathForStudent(student, status === "applied") : path;
+      });
+      if (status !== "applied") return updated;
+      const existingIds = new Set(updated.map((path) => path.id));
+      return [...updated, ...classroomRoster.map((student) => classroomPathForStudent(student, true)).filter((path) => !existingIds.has(path.id))];
+    });
     setReviews((current) => {
-      const withoutCurriculumReviews = current.filter((review) => !review.id.startsWith("classroom-curriculum-review-"));
+      const reviewPrefix = `classroom-curriculum-review-${defaultClassroomAssignmentId}-`;
+      const withoutCurriculumReviews = current.filter((review) => !review.id.startsWith(reviewPrefix));
       if (status !== "applied") return withoutCurriculumReviews;
       const dueAt = new Date().toISOString();
       return [...withoutCurriculumReviews, ...classroomRoster.map((student) => ({
-        id: `classroom-curriculum-review-${student.id}`,
-        pathId: classroomPathId(student.id),
+        id: `${reviewPrefix}${student.id}`,
+        pathId: classroomPathId(student.id, defaultClassroomAssignmentId),
         conceptIndex: 3,
         dueAt,
         memory: { intervalDays: 1, ease: 2.5, repetitions: 0 },
         reason: "research" as const,
       }))];
     });
+  };
+
+  const createClassroomClass = (input: NewClassInput) => {
+    const classId = `${slugifyClassroomValue(input.name)}-${slugifyClassroomValue(input.section)}-${classroomClasses.length + 1}`;
+    const students = input.students.map((student, index) => classroomStudentFromInput(
+      `${classId}-${slugifyClassroomValue(student.name)}-${index + 1}`,
+      student.name,
+      student.interest,
+    ));
+    const classroomClass: ClassroomClass = {
+      id: classId,
+      name: input.name,
+      section: input.section,
+      studentIds: students.map((student) => student.id),
+      createdAt: new Date().toISOString(),
+    };
+    setClassroomClasses((current) => [...current, classroomClass]);
+    setClassroomCustomStudents((current) => [...current, ...students]);
+    setClassroomNavigation({
+      ...defaultClassroomNavigation,
+      activeClassId: classId,
+      activeAssignmentId: "",
+      selectedStudentId: students[0].id,
+    });
+  };
+
+  const createClassroomAssignment = (input: NewAssignmentInput) => {
+    const sourcePath = classroomAvailablePaths.find((path) => path.id === input.pathId);
+    if (!sourcePath) return;
+    const assignment: ClassroomAssignment = {
+      id: `${activeClassroomClass.id}-${slugifyClassroomValue(sourcePath.title)}-${classroomAssignments.length + 1}`,
+      classId: activeClassroomClass.id,
+      pathId: sourcePath.id,
+      title: sourcePath.title,
+      objective: sourcePath.description,
+      dueAt: `${input.dueAt}T23:59:00.000Z`,
+      createdAt: new Date().toISOString(),
+    };
+    setClassroomAssignments((current) => [...current, assignment]);
+    setClassroomNavigation((current) => ({
+      ...current,
+      activeClassId: activeClassroomClass.id,
+      activeAssignmentId: assignment.id,
+      selectedStudentId: activeClassroomClass.studentIds[0] ?? current.selectedStudentId,
+      view: "overview",
+      attentionOnly: false,
+      studentQuery: "",
+    }));
   };
 
   const resetDemo = async () => {
@@ -625,7 +725,10 @@ export function CurrentWorkspace() {
     setClassroomUpdateStatus("ready");
     setClassroomNavigation(defaultClassroomNavigation);
     setClassroomStudentEvidence({});
-    setClassroomPreviewStudentId(null);
+    setClassroomClasses(defaultClassroomClasses);
+    setClassroomAssignments(defaultClassroomAssignments);
+    setClassroomCustomStudents([]);
+    setClassroomPreview(null);
     resetLessonActivity("read");
     setWorkspaceView("lesson");
   };
@@ -817,9 +920,17 @@ export function CurrentWorkspace() {
       <main className="learning-canvas">
         {workspaceView === "classroom" ? (
           <ClassroomWorkspace
+            classes={classroomClasses}
+            assignments={classroomAssignments}
             students={classroomRoster}
+            activeClass={activeClassroomClass}
+            activeAssignment={activeClassroomAssignment}
+            assignmentPath={activeClassroomAssignmentPath}
+            availablePaths={classroomAvailablePaths}
             navigation={classroomNavigation}
             onNavigationChange={setClassroomNavigation}
+            onCreateClass={createClassroomClass}
+            onCreateAssignment={createClassroomAssignment}
             onOpenLearningMap={openLearningMap}
             onPreviewStudent={openClassroomStudent}
             updateStatus={classroomUpdateStatus}
@@ -1008,27 +1119,26 @@ function sanitizeTextRecord(value: unknown): Record<string, string> {
 function sanitizeClassroomNavigation(value: unknown): ClassroomNavigationState {
   if (!value || typeof value !== "object") return defaultClassroomNavigation;
   const navigation = value as Partial<ClassroomNavigationState>;
-  const selectedStudentId = classroomStudents.some((student) => student.id === navigation.selectedStudentId)
-    ? navigation.selectedStudentId as string
-    : defaultClassroomNavigation.selectedStudentId;
   return {
     view: navigation.view === "students" || navigation.view === "updates" ? navigation.view : "overview",
-    selectedStudentId,
+    selectedStudentId: typeof navigation.selectedStudentId === "string" ? navigation.selectedStudentId.slice(0, 140) : defaultClassroomNavigation.selectedStudentId,
     studentQuery: typeof navigation.studentQuery === "string" ? navigation.studentQuery.slice(0, 80) : "",
     attentionOnly: Boolean(navigation.attentionOnly),
+    activeClassId: typeof navigation.activeClassId === "string" ? navigation.activeClassId.slice(0, 140) : defaultClassroomNavigation.activeClassId,
+    activeAssignmentId: typeof navigation.activeAssignmentId === "string" ? navigation.activeAssignmentId.slice(0, 180) : defaultClassroomNavigation.activeAssignmentId,
   };
 }
 
 function sanitizeClassroomEvidence(value: unknown): Record<string, ClassroomStudentEvidence> {
   if (!value || typeof value !== "object") return {};
   const evidence: Record<string, ClassroomStudentEvidence> = {};
-  for (const [studentId, candidate] of Object.entries(value)) {
-    if (!classroomStudents.some((student) => student.id === studentId) || !candidate || typeof candidate !== "object") continue;
+  for (const [evidenceKey, candidate] of Object.entries(value)) {
+    if (!evidenceKey.includes(":") || evidenceKey.length > 320 || !candidate || typeof candidate !== "object") continue;
     const item = candidate as Partial<ClassroomStudentEvidence>;
     if (typeof item.mastery !== "number" || typeof item.completedConcepts !== "number" || typeof item.lastActive !== "string") continue;
     if (item.status !== "on_track" && item.status !== "needs_support" && item.status !== "ahead") continue;
     if (item.misconception !== null && typeof item.misconception !== "string") continue;
-    evidence[studentId] = {
+    evidence[evidenceKey] = {
       mastery: Math.max(0, Math.min(100, Math.round(item.mastery))),
       completedConcepts: Math.max(0, Math.min(4, Math.round(item.completedConcepts))),
       status: item.status,
@@ -1039,6 +1149,65 @@ function sanitizeClassroomEvidence(value: unknown): Record<string, ClassroomStud
     };
   }
   return evidence;
+}
+
+function sanitizeClassroomClasses(value: unknown): ClassroomClass[] {
+  if (!Array.isArray(value)) return defaultClassroomClasses;
+  const customClasses = value.filter((candidate): candidate is ClassroomClass => {
+    if (!candidate || typeof candidate !== "object") return false;
+    const item = candidate as Partial<ClassroomClass>;
+    return typeof item.id === "string"
+      && typeof item.name === "string"
+      && typeof item.section === "string"
+      && typeof item.createdAt === "string"
+      && Array.isArray(item.studentIds)
+      && item.studentIds.length > 0
+      && item.studentIds.every((studentId) => typeof studentId === "string");
+  }).filter((item) => item.id !== defaultClassroomClasses[0].id).slice(0, 11).map((item) => ({
+    id: item.id.slice(0, 140),
+    name: item.name.slice(0, 80),
+    section: item.section.slice(0, 80),
+    studentIds: item.studentIds.slice(0, 30).map((studentId) => studentId.slice(0, 140)),
+    createdAt: item.createdAt,
+  }));
+  return [...defaultClassroomClasses, ...customClasses];
+}
+
+function sanitizeClassroomAssignments(value: unknown): ClassroomAssignment[] {
+  if (!Array.isArray(value)) return defaultClassroomAssignments;
+  const customAssignments = value.filter((candidate): candidate is ClassroomAssignment => {
+    if (!candidate || typeof candidate !== "object") return false;
+    const item = candidate as Partial<ClassroomAssignment>;
+    return typeof item.id === "string"
+      && typeof item.classId === "string"
+      && typeof item.pathId === "string"
+      && typeof item.title === "string"
+      && typeof item.objective === "string"
+      && typeof item.dueAt === "string"
+      && !Number.isNaN(new Date(item.dueAt).getTime())
+      && typeof item.createdAt === "string";
+  }).filter((item) => item.id !== defaultClassroomAssignmentId).slice(0, 60).map((item) => ({
+    id: item.id.slice(0, 180),
+    classId: item.classId.slice(0, 140),
+    pathId: item.pathId.slice(0, 140),
+    title: item.title.slice(0, 120),
+    objective: item.objective.slice(0, 500),
+    dueAt: item.dueAt,
+    createdAt: item.createdAt,
+  }));
+  return [...defaultClassroomAssignments, ...customAssignments];
+}
+
+function sanitizeClassroomStudents(value: unknown): ClassroomStudent[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((candidate) => {
+    if (!candidate || typeof candidate !== "object") return false;
+    const item = candidate as Partial<ClassroomStudent>;
+    return typeof item.id === "string" && typeof item.name === "string" && typeof item.interest === "string";
+  }).slice(0, 120).map((candidate) => {
+    const item = candidate as ClassroomStudent;
+    return classroomStudentFromInput(item.id.slice(0, 140), item.name.slice(0, 80), item.interest.slice(0, 120));
+  });
 }
 
 function sanitizeLearnerProfile(value: unknown): LearnerProfile {

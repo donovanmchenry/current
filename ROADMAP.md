@@ -72,7 +72,8 @@ The MVP is complete when a judge can provide a source, receive a live GPT-5.6-ge
 - [x] Return student recall evidence to the teacher roster and misconception signal.
 - [x] Let teachers assign targeted review to the affected group.
 - [x] Persist teacher navigation, evidence, and curriculum decisions on the device.
-- [ ] Add class creation, reusable assignment authoring, and durable rosters after Build Week.
+- [x] Let teachers create rostered classes and assign any existing Current path with a due date.
+- [x] Keep classes, assignments, rosters, and assignment-scoped evidence on the device.
 
 ## Phase 1: Personal Current
 
@@ -165,7 +166,6 @@ These may become useful later, but none proves Current's central claim as direct
 
 1. Finish Classroom visual and interaction validation for the Build Week demo.
 2. Add learner profiles and age-appropriate interest collection.
-3. Let teachers create classes and assign any Current learning path.
-4. Persist rosters, assignments, approvals, and student progress across devices.
-5. Add teacher-authored constraints for sources, objectives, reading level, and accommodations.
-6. Pilot the misconception and differentiation workflow with educators before expanding analytics.
+3. Persist rosters, assignments, approvals, and student progress across devices.
+4. Add teacher-authored constraints for sources, objectives, reading level, and accommodations.
+5. Pilot the misconception and differentiation workflow with educators before expanding analytics.
