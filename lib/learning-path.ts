@@ -92,6 +92,8 @@ export type LearningPath = {
   sources?: LearningSource[];
   userCreated?: boolean;
   createdAt?: string;
+  classroomStudentId?: string;
+  classroomAssignmentId?: string;
 };
 
 export type GeneratedLearningPath = {

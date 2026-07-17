@@ -13,10 +13,11 @@ Target runtime: 2 minutes 50 seconds. This leaves a 10-second buffer below the s
 | 1:10-1:25 | Complete Apply, enter Reflect, and schedule review. | "Apply checks transfer, reflection connects the concept to my work, and the result schedules spaced review based on how much support I needed." |
 | 1:25-1:40 | Return to Updates, inspect the source delta, and apply it. | "A research agent can detect changed evidence, but updates stay inspectable and require approval before they patch the curriculum." |
 | 1:40-1:50 | Open New Path, choose Use sample, then jump cut to the Sol-labeled outline. | "Sol can also plan a new source-grounded path from a goal, files, and links; this one came from the attached evaluation note." |
-| 1:50-2:08 | Open Classroom and show the assignment, class mastery, and shared recall gap. | "Current Classroom takes the same learning loop into K-12. A teacher sees one shared objective, class progress, and the misconception connecting several students." |
-| 2:08-2:28 | Select Jordan and open his student view. | "Jordan needs help treating slope as a rate. Current uses basketball scoring and unit labels because that context is useful to him, while the source, objective, and rubric remain the same for the class." |
-| 2:28-2:42 | Return to Classroom Updates and approve the proposed checkpoint. | "Research agents can propose a curriculum change and show its class impact, but nothing reaches students until the teacher approves it." |
-| 2:42-2:50 | End on the Classroom overview. | "I built Current in one continuous Codex task and routed planning, authoring, coaching, and research across GPT-5.6. Current helps every student go deeper without taking the teacher out of the loop." |
+| 1:50-2:05 | Open Classroom and show the assignment, class mastery, and shared recall gap. | "Current Classroom takes the same learning loop into K-12. A teacher sees one shared objective, class progress, and the misconception connecting several students." |
+| 2:05-2:20 | Choose Review group, assign the slope review, and open Jordan's student view. | "Jordan needs help treating slope as a rate. Current assigns targeted review and uses basketball scoring and unit labels for him without changing the class objective or rubric." |
+| 2:20-2:34 | Jump cut to Jordan's completed recall, then return to the preserved Students view. | "His evidence returns to the teacher immediately. The misconception clears, mastery updates, and Jordan leaves the support cohort while every student's state remains isolated." |
+| 2:34-2:45 | Open Classroom Updates and approve the proposed checkpoint. | "Research agents can propose a curriculum change and its class impact, but nothing reaches students until the teacher approves it. Approval creates the revised checkpoint and review queue." |
+| 2:45-2:50 | End on the Classroom overview. | "I built Current in one continuous Codex task and routed planning, authoring, coaching, and research across GPT-5.6. Current helps every student go deeper without taking the teacher out of the loop." |
 
 ## Prepared responses
 
@@ -36,6 +37,12 @@ Reflection:
 
 ```text
 I would use compaction in a long-running research agent so it can preserve decisions and tool context while keeping later requests within the context window.
+```
+
+Classroom recall:
+
+```text
+Slope compares the change in output with the change in input. It is a rate per one unit, such as points per minute, so the units explain the relationship.
 ```
 
 ## Recording preflight

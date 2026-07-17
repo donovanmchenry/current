@@ -270,7 +270,8 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(map, /className="map-classroom-link" onClick=\{onOpenClassroom\}/);
 
   assert.match(classroom, /aria-label="Current Classroom"/);
-  assert.match(classroom, /type ClassroomView = "overview" \| "students" \| "updates"/);
+  assert.match(classroom, /navigation: ClassroomNavigationState/);
+  assert.match(classroom, /onNavigationChange: \(state: ClassroomNavigationState\) => void/);
   assert.match(classroom, /Shared recall gap/);
   assert.match(classroom, /Review group/);
   assert.match(classroom, /aria-label="Search students"/);
@@ -278,7 +279,11 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(classroom, /Current proposes changes\. Teachers decide what reaches students\./);
   assert.match(classroom, /Open student view/);
   assert.match(classroom, /onPreviewStudent\(selectedStudent, updateStatus === "applied"\)/);
+  assert.match(classroom, /Assign slope review/);
+  assert.match(classroom, /Latest recall/);
   assert.match(catalog, /export function classroomPathForStudent/);
+  assert.match(catalog, /id: classroomPathId\(student\.id\)/);
+  assert.match(catalog, /export function classroomEvidenceAfterRecall/);
   assert.match(catalog, /curriculumUpdateApplied[\s\S]*Compare slope and intercept across tables, graphs, equations, and verbal descriptions/);
   assert.match(catalog, /Personalized context does not change the class objective/);
   assert.match(catalog, /provenance: "Adapted from teacher-approved materials"/);
@@ -290,6 +295,11 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(styles, /\.classroom-assignment-band[^}]*border-radius:\s*8px/s);
   assert.match(styles, /\.classroom-roster > header, \.classroom-roster > button[^}]*grid-template-columns/s);
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*\.classroom-shell[^}]*flex-direction:\s*column/s);
+  assert.match(styles, /\.classroom-preview-bar[^}]*top:\s*54px/s);
+  assert.match(workspace, /Previewing \{classroomPreviewStudent\.name\}/);
+  assert.match(workspace, /classroomUpdateStatus,[\s\S]*classroomNavigation,[\s\S]*classroomStudentEvidence/);
+  assert.match(workspace, /classroom-curriculum-review-/);
+  assert.match(workspace, /classroom-support-review-/);
   assert.doesNotMatch(classroom, /text-transform|uppercase/);
 });
 

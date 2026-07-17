@@ -41,7 +41,7 @@ The learner stays in control. Sources remain visible. Model decisions are labele
 - **Concept-level memory.** Current remembers misconceptions, successful support modes, attempts, progress, notes, and reflections by concept.
 - **Spaced review.** Clean recall earns a longer interval; concepts that needed help return sooner.
 - **Living curricula.** A research agent compares stored and current source evidence, shows the diff, identifies affected concepts, and waits for approval.
-- **Current Classroom.** Teachers can inspect class-level misconceptions, see interest-aware supports, preview the exact student experience, and approve curriculum updates before they reach the class.
+- **Current Classroom.** Teachers can turn a class misconception into targeted review, preview the exact interest-aware student experience, see recall evidence return to the roster, and approve curriculum updates before they reach the class.
 - **Reopenable sources.** Uploaded artifacts persist locally and can be viewed or downloaded from the workspace.
 - **A real reset button.** Judges can restore the seeded state in one click. Demo reliability is a product feature too.
 

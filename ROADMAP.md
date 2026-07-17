@@ -68,6 +68,10 @@ The MVP is complete when a judge can provide a source, receive a live GPT-5.6-ge
 - [x] Surface class-level misconception signals without ranking students publicly.
 - [x] Let a teacher inspect the exact support and lesson a student will receive.
 - [x] Require teacher approval before a research update changes the student path.
+- [x] Isolate progress, notes, reviews, and recall memory by student.
+- [x] Return student recall evidence to the teacher roster and misconception signal.
+- [x] Let teachers assign targeted review to the affected group.
+- [x] Persist teacher navigation, evidence, and curriculum decisions on the device.
 - [ ] Add class creation, reusable assignment authoring, and durable rosters after Build Week.
 
 ## Phase 1: Personal Current

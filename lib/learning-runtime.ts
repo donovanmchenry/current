@@ -1,4 +1,5 @@
 import type { LearningPath, SourceSnapshot, SourceUpdateProposal } from "./learning-path";
+import type { ClassroomNavigationState, ClassroomStudentEvidence } from "./classroom-catalog";
 import type { ReviewMemory } from "./spaced-review";
 
 export type PathProgress = {
@@ -39,6 +40,9 @@ export type LearningRuntimeSnapshot = {
   researchUpdateApplied?: boolean;
   learnerProfile?: LearnerProfile;
   conceptMemories?: Record<string, ConceptMemory>;
+  classroomUpdateStatus?: "ready" | "applied" | "dismissed";
+  classroomNavigation?: ClassroomNavigationState;
+  classroomStudentEvidence?: Record<string, ClassroomStudentEvidence>;
 };
 
 export type CheckedSourceSnapshot = {
@@ -154,7 +158,9 @@ export function reviewQualityForAttempt(score: number, attemptsThisSession: numb
 export function isStoredLearningPath(value: unknown): value is LearningPath {
   if (!value || typeof value !== "object") return false;
   const path = value as Partial<LearningPath>;
-  if (!path.userCreated || typeof path.id !== "string" || !path.id.startsWith("custom-") || typeof path.title !== "string" || typeof path.description !== "string") return false;
+  const validId = typeof path.id === "string" && (path.id.startsWith("custom-") || path.id.startsWith("classroom-"));
+  if (!path.userCreated || !validId || typeof path.title !== "string" || typeof path.description !== "string") return false;
+  if (path.id.startsWith("classroom-") && typeof path.classroomStudentId !== "string") return false;
   if (typeof path.progress !== "number" || typeof path.next !== "string" || typeof path.status !== "string" || !Array.isArray(path.concepts) || path.concepts.length < 1) return false;
   if (!path.concepts.every((concept) => concept
     && typeof concept.title === "string"

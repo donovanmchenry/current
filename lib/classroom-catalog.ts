@@ -17,7 +17,65 @@ export type ClassroomStudent = {
   applicationPrompt: string;
   applicationOptions: string[];
   applicationCorrectIndex: number;
+  recallAttempts?: number;
+  lastScore?: number;
 };
+
+export type ClassroomStudentEvidence = {
+  mastery: number;
+  completedConcepts: number;
+  status: ClassroomStudentStatus;
+  lastActive: string;
+  misconception: string | null;
+  recallAttempts: number;
+  lastScore: number | null;
+};
+
+export type ClassroomView = "overview" | "students" | "updates";
+
+export type ClassroomNavigationState = {
+  view: ClassroomView;
+  selectedStudentId: string;
+  studentQuery: string;
+  attentionOnly: boolean;
+};
+
+export const defaultClassroomNavigation: ClassroomNavigationState = {
+  view: "overview",
+  selectedStudentId: "jordan-brooks",
+  studentQuery: "",
+  attentionOnly: false,
+};
+
+export function classroomPathId(studentId: string) {
+  return `classroom-linear-relationships-${studentId}`;
+}
+
+export function classroomStudentsWithEvidence(evidence: Record<string, ClassroomStudentEvidence>) {
+  return classroomStudents.map((student) => {
+    const latest = evidence[student.id];
+    return latest ? { ...student, ...latest } : student;
+  });
+}
+
+export function classroomEvidenceAfterRecall(
+  student: ClassroomStudent,
+  previous: ClassroomStudentEvidence | undefined,
+  result: { score: number; misconception: string | null; feedback: string },
+): ClassroomStudentEvidence {
+  const baselineMastery = previous?.mastery ?? student.mastery;
+  const mastery = Math.max(0, Math.min(100, Math.round((baselineMastery * 4 + result.score) / 5)));
+  const passed = result.score >= 75;
+  return {
+    mastery,
+    completedConcepts: previous?.completedConcepts ?? student.completedConcepts,
+    status: passed ? (mastery >= 85 ? "ahead" : "on_track") : "needs_support",
+    lastActive: "Just now",
+    misconception: passed ? null : result.misconception ?? result.feedback,
+    recallAttempts: (previous?.recallAttempts ?? 0) + 1,
+    lastScore: Math.round(result.score),
+  };
+}
 
 export const classroomStudents: ClassroomStudent[] = [
   {
@@ -152,7 +210,7 @@ export const classroomStudents: ClassroomStudent[] = [
 
 export function classroomPathForStudent(student: ClassroomStudent, curriculumUpdateApplied = false): LearningPath {
   return {
-    id: "classroom-linear-relationships",
+    id: classroomPathId(student.id),
     title: "Linear relationships",
     description: `Assigned in Algebra I and adapted with ${student.interest.toLowerCase()} contexts for ${student.name}.`,
     progress: student.mastery,
@@ -160,6 +218,8 @@ export function classroomPathForStudent(student: ClassroomStudent, curriculumUpd
     status: "Assigned by Ms. Rodriguez",
     relatedPathId: null,
     userCreated: true,
+    classroomStudentId: student.id,
+    classroomAssignmentId: "algebra-1-linear-relationships",
     createdAt: "2026-07-17T00:00:00.000Z",
     sources: [
       {

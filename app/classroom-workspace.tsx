@@ -2,7 +2,6 @@
 
 import {
   Activity,
-  ArrowLeft,
   ArrowRight,
   BookOpenCheck,
   Check,
@@ -16,20 +15,24 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { classroomStudents, type ClassroomStudent } from "../lib/classroom-catalog";
+import { useMemo } from "react";
+import type { ClassroomNavigationState, ClassroomStudent } from "../lib/classroom-catalog";
 
-type ClassroomView = "overview" | "students" | "updates";
 export type ClassroomUpdateStatus = "ready" | "applied" | "dismissed";
 
 type ClassroomWorkspaceProps = {
+  students: ClassroomStudent[];
+  navigation: ClassroomNavigationState;
+  onNavigationChange: (state: ClassroomNavigationState) => void;
   onOpenLearningMap: () => void;
   onPreviewStudent: (student: ClassroomStudent, curriculumUpdateApplied: boolean) => void;
   updateStatus: ClassroomUpdateStatus;
   onSetUpdateStatus: (status: ClassroomUpdateStatus) => void;
+  supportReviewAssigned: boolean;
+  onAssignSupportReview: () => void;
 };
 
-const viewItems: Array<{ id: ClassroomView; label: string; icon: typeof Users }> = [
+const viewItems: Array<{ id: ClassroomNavigationState["view"]; label: string; icon: typeof Users }> = [
   { id: "overview", label: "Overview", icon: GraduationCap },
   { id: "students", label: "Students", icon: Users },
   { id: "updates", label: "Updates", icon: Activity },
@@ -41,28 +44,23 @@ function studentStatusLabel(status: ClassroomStudent["status"]) {
   return "On track";
 }
 
-export function ClassroomWorkspace({ onOpenLearningMap, onPreviewStudent, updateStatus, onSetUpdateStatus }: ClassroomWorkspaceProps) {
-  const [view, setView] = useState<ClassroomView>("overview");
-  const [selectedStudentId, setSelectedStudentId] = useState(classroomStudents[1].id);
-  const [studentQuery, setStudentQuery] = useState("");
-  const [attentionOnly, setAttentionOnly] = useState(false);
+export function ClassroomWorkspace({ students, navigation, onNavigationChange, onOpenLearningMap, onPreviewStudent, updateStatus, onSetUpdateStatus, supportReviewAssigned, onAssignSupportReview }: ClassroomWorkspaceProps) {
+  const { view, selectedStudentId, studentQuery, attentionOnly } = navigation;
+  const updateNavigation = (patch: Partial<ClassroomNavigationState>) => onNavigationChange({ ...navigation, ...patch });
 
-  const selectedStudent = classroomStudents.find((student) => student.id === selectedStudentId) ?? classroomStudents[0];
-  const supportStudents = classroomStudents.filter((student) => student.status === "needs_support");
-  const averageMastery = Math.round(classroomStudents.reduce((total, student) => total + student.mastery, 0) / classroomStudents.length);
+  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? students[0];
+  const supportStudents = students.filter((student) => student.status === "needs_support");
+  const averageMastery = Math.round(students.reduce((total, student) => total + student.mastery, 0) / students.length);
   const visibleStudents = useMemo(() => {
     const normalizedQuery = studentQuery.trim().toLowerCase();
-    return classroomStudents.filter((student) => {
+    return students.filter((student) => {
       if (attentionOnly && student.status !== "needs_support") return false;
       return !normalizedQuery || `${student.name} ${student.interest} ${student.support}`.toLowerCase().includes(normalizedQuery);
     });
-  }, [attentionOnly, studentQuery]);
+  }, [attentionOnly, studentQuery, students]);
 
   const openAttentionGroup = () => {
-    setAttentionOnly(true);
-    setStudentQuery("");
-    setSelectedStudentId(supportStudents[0].id);
-    setView("students");
+    updateNavigation({ attentionOnly: true, studentQuery: "", selectedStudentId: supportStudents[0]?.id ?? selectedStudent.id, view: "students" });
   };
 
   return (
@@ -77,28 +75,27 @@ export function ClassroomWorkspace({ onOpenLearningMap, onPreviewStudent, update
         <div className="classroom-view-switcher" role="tablist" aria-label="Classroom view">
           {viewItems.map((item) => {
             const Icon = item.icon;
-            return <button role="tab" aria-selected={view === item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)} key={item.id}><Icon size={14} />{item.label}{item.id === "updates" && updateStatus === "ready" ? <span className="classroom-update-indicator" /> : null}</button>;
+            return <button role="tab" aria-selected={view === item.id} className={view === item.id ? "active" : ""} onClick={() => updateNavigation({ view: item.id })} key={item.id}><Icon size={14} />{item.label}{item.id === "updates" && updateStatus === "ready" ? <span className="classroom-update-indicator" /> : null}</button>;
           })}
         </div>
         <button className="classroom-map-action" onClick={onOpenLearningMap}><Network size={14} /> Learning map</button>
       </header>
 
       <aside className="classroom-sidebar">
-        <button className="classroom-back" onClick={onOpenLearningMap}><ArrowLeft size={14} /> Back to learning</button>
         <div className="classroom-class-title">
           <span>Algebra I</span>
           <strong>Period 2</strong>
-          <small>{classroomStudents.length} students</small>
+          <small>{students.length} students</small>
         </div>
         <nav aria-label="Classroom sections">
           {viewItems.map((item) => {
             const Icon = item.icon;
-            return <button className={view === item.id ? "active" : ""} onClick={() => setView(item.id)} key={item.id}><Icon size={15} /><span>{item.label}</span>{item.id === "updates" && updateStatus === "ready" ? <small>1</small> : null}</button>;
+            return <button className={view === item.id ? "active" : ""} onClick={() => updateNavigation({ view: item.id })} key={item.id}><Icon size={15} /><span>{item.label}</span>{item.id === "updates" && updateStatus === "ready" ? <small>1</small> : null}</button>;
           })}
         </nav>
         <div className="classroom-assignment-nav">
           <span>Assigned path</span>
-          <button onClick={() => { setView("overview"); }}><BookOpenCheck size={15} /><div><strong>Linear relationships</strong><small>Due Friday</small></div></button>
+          <button onClick={() => updateNavigation({ view: "overview" })}><BookOpenCheck size={15} /><div><strong>Linear relationships</strong><small>Due Friday</small></div></button>
         </div>
       </aside>
 
@@ -112,7 +109,7 @@ export function ClassroomWorkspace({ onOpenLearningMap, onPreviewStudent, update
 
             <section className="classroom-metrics" aria-label="Class progress">
               <div><span>Class mastery</span><strong>{averageMastery}%</strong></div>
-              <div><span>On pace</span><strong>{classroomStudents.length - supportStudents.length} of {classroomStudents.length}</strong></div>
+              <div><span>On pace</span><strong>{students.length - supportStudents.length} of {students.length}</strong></div>
               <div><span>Needs support</span><strong>{supportStudents.length}</strong></div>
               <div><span>Pending updates</span><strong>{updateStatus === "ready" ? 1 : 0}</strong></div>
             </section>
@@ -133,16 +130,16 @@ export function ClassroomWorkspace({ onOpenLearningMap, onPreviewStudent, update
               <button onClick={openAttentionGroup}>Review group <ArrowRight size={13} /></button>
             </section>
 
-            <StudentTable students={classroomStudents} selectedStudentId={selectedStudent.id} onSelect={setSelectedStudentId} />
+            <StudentTable students={students} selectedStudentId={selectedStudent.id} onSelect={(id) => updateNavigation({ selectedStudentId: id })} />
           </div>
         ) : view === "students" ? (
           <div className="classroom-view classroom-students-view">
-            <header className="classroom-page-heading"><div><h1>Students</h1><p>Progress and observed learning gaps for Linear relationships.</p></div></header>
+            <header className="classroom-page-heading"><div><h1>Students</h1><p>Progress and observed learning gaps for Linear relationships.</p></div>{attentionOnly ? <button disabled={supportReviewAssigned} onClick={onAssignSupportReview}><BookOpenCheck size={14} /> {supportReviewAssigned ? "Review assigned" : "Assign slope review"}</button> : null}</header>
             <div className="classroom-student-tools">
-              <label><Search size={14} /><input value={studentQuery} onChange={(event) => setStudentQuery(event.target.value)} placeholder="Search students or interests" aria-label="Search students" /></label>
-              <button className={attentionOnly ? "active" : ""} aria-pressed={attentionOnly} onClick={() => setAttentionOnly((current) => !current)}><Filter size={13} /> Needs support{attentionOnly ? <X size={12} /> : null}</button>
+              <label><Search size={14} /><input value={studentQuery} onChange={(event) => updateNavigation({ studentQuery: event.target.value })} placeholder="Search students or interests" aria-label="Search students" /></label>
+              <button className={attentionOnly ? "active" : ""} aria-pressed={attentionOnly} onClick={() => updateNavigation({ attentionOnly: !attentionOnly })}><Filter size={13} /> Needs support{attentionOnly ? <X size={12} /> : null}</button>
             </div>
-            <StudentTable students={visibleStudents} selectedStudentId={selectedStudent.id} onSelect={setSelectedStudentId} emptyMessage="No students match this view." />
+            <StudentTable students={visibleStudents} selectedStudentId={selectedStudent.id} onSelect={(id) => updateNavigation({ selectedStudentId: id })} emptyMessage="No students match this view." />
           </div>
         ) : (
           <div className="classroom-view classroom-updates-view">
@@ -155,7 +152,7 @@ export function ClassroomWorkspace({ onOpenLearningMap, onPreviewStudent, update
                 <div><small>Stored objective</small><p>Identify slope and intercept from an equation.</p></div>
                 <div><small>Latest objective</small><p>Compare slope and intercept across tables, graphs, equations, and verbal descriptions.</p></div>
               </div>
-              <div className="classroom-update-impact"><Sparkles size={15} /><div><strong>Proposed classroom impact</strong><span>Adds one checkpoint to Compare representations and schedules a short review for all {classroomStudents.length} students.</span></div></div>
+              <div className="classroom-update-impact"><Sparkles size={15} /><div><strong>Proposed classroom impact</strong><span>Adds one checkpoint to Compare representations and schedules a short review for all {students.length} students.</span></div></div>
               {updateStatus === "ready" ? <div className="classroom-update-actions"><button onClick={() => onSetUpdateStatus("applied")}><Check size={13} /> Approve update</button><button onClick={() => onSetUpdateStatus("dismissed")}>Dismiss</button></div> : <button className="classroom-reopen-update" onClick={() => onSetUpdateStatus("ready")}>Reopen review</button>}
             </article>
           </div>
@@ -203,6 +200,7 @@ function StudentInspector({ student, onPreview }: { student: ClassroomStudent; o
       <span>Selected student</span>
       <div className="classroom-inspector-student"><i>{student.initials}</i><div><h2>{student.name}</h2><p>{studentStatusLabel(student.status)} · {student.mastery}% mastery</p></div></div>
       <div className="classroom-inspector-progress"><span><i style={{ width: `${student.mastery}%` }} /></span><small>{student.completedConcepts} of 4 concepts</small></div>
+      {typeof student.lastScore === "number" ? <div className="classroom-latest-evidence"><span>Latest recall</span><strong>{student.lastScore}%</strong><small>{student.recallAttempts ?? 1} recorded attempt{student.recallAttempts === 1 ? "" : "s"}</small></div> : null}
       {student.misconception ? <div className="classroom-inspector-gap"><small>Observed gap</small><p>{student.misconception}</p></div> : <div className="classroom-inspector-gap resolved"><small>Latest recall</small><p>No unresolved misconception.</p></div>}
       <div className="classroom-personalization"><span><Sparkles size={13} /> Personalized support</span><strong>{student.support}</strong><p>Interest: {student.interest}. The class objective and scoring rubric remain unchanged.</p></div>
       <button className="classroom-preview-student" onClick={onPreview}><BookOpenCheck size={14} /> Open student view</button>

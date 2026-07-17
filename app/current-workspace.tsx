@@ -25,7 +25,17 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { classroomPathForStudent, type ClassroomStudent } from "../lib/classroom-catalog";
+import {
+  classroomPathForStudent,
+  classroomPathId,
+  classroomEvidenceAfterRecall,
+  classroomStudents,
+  classroomStudentsWithEvidence,
+  defaultClassroomNavigation,
+  type ClassroomNavigationState,
+  type ClassroomStudent,
+  type ClassroomStudentEvidence,
+} from "../lib/classroom-catalog";
 import { basePaths, suggestedPath } from "../lib/learning-catalog";
 import type { GeneratedLesson, LearningConcept, LearningPath, LearningSource, LessonApplication, SourceSnapshot, SourceUpdateProposal } from "../lib/learning-path";
 import { currentModelLabel, type CurrentModelId } from "../lib/model-routing";
@@ -175,6 +185,9 @@ export function CurrentWorkspace() {
   const [notebookOpen, setNotebookOpen] = useState(false);
   const [activeArtifactSource, setActiveArtifactSource] = useState<LearningSource | null>(null);
   const [classroomUpdateStatus, setClassroomUpdateStatus] = useState<ClassroomUpdateStatus>("ready");
+  const [classroomNavigation, setClassroomNavigation] = useState<ClassroomNavigationState>(defaultClassroomNavigation);
+  const [classroomStudentEvidence, setClassroomStudentEvidence] = useState<Record<string, ClassroomStudentEvidence>>({});
+  const [classroomPreviewStudentId, setClassroomPreviewStudentId] = useState<string | null>(null);
   const hydrated = useRef(false);
   const lessonScrollRef = useRef<HTMLDivElement>(null);
   const lessonRequestKey = useRef<string | null>(null);
@@ -202,6 +215,9 @@ export function CurrentWorkspace() {
   const isCompactionLesson = activePath.id === "long-running" && safeConceptIndex === 1;
   const activeNoteExcerpt = activeConcept.sourceNote ?? activeConcept.objective;
   const highlighted = isCompactionLesson && notes.includes(activeNoteExcerpt);
+  const classroomRoster = useMemo(() => classroomStudentsWithEvidence(classroomStudentEvidence), [classroomStudentEvidence]);
+  const classroomPreviewStudent = classroomPreviewStudentId ? classroomRoster.find((student) => student.id === classroomPreviewStudentId) ?? null : null;
+  const supportReviewAssigned = reviews.some((review) => review.id.startsWith("classroom-support-review-"));
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -223,6 +239,9 @@ export function CurrentWorkspace() {
           setResearchUpdateApplied(Boolean(saved.researchUpdateApplied));
           if (saved.learnerProfile) setLearnerProfile(sanitizeLearnerProfile(saved.learnerProfile));
           if (saved.conceptMemories) setConceptMemories(sanitizeConceptMemories(saved.conceptMemories));
+          if (saved.classroomUpdateStatus === "ready" || saved.classroomUpdateStatus === "applied" || saved.classroomUpdateStatus === "dismissed") setClassroomUpdateStatus(saved.classroomUpdateStatus);
+          if (saved.classroomNavigation) setClassroomNavigation(sanitizeClassroomNavigation(saved.classroomNavigation));
+          if (saved.classroomStudentEvidence) setClassroomStudentEvidence(sanitizeClassroomEvidence(saved.classroomStudentEvidence));
         } else {
           const oldNotes = window.localStorage.getItem("current-notebook-v2") ?? "";
           const oldReflection = window.localStorage.getItem("current-reflection-v1") ?? "";
@@ -260,9 +279,12 @@ export function CurrentWorkspace() {
       researchUpdateApplied,
       learnerProfile,
       conceptMemories,
+      classroomUpdateStatus,
+      classroomNavigation,
+      classroomStudentEvidence,
     };
     window.localStorage.setItem(runtimeStorageKey, JSON.stringify(snapshot));
-  }, [activePath.id, checkedSources, conceptMemories, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, sourceUpdates, suggestedPathAdded]);
+  }, [activePath.id, checkedSources, classroomNavigation, classroomStudentEvidence, classroomUpdateStatus, conceptMemories, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, sourceUpdates, suggestedPathAdded]);
 
   useEffect(() => {
     if (workspaceView !== "lesson" || !activePath.userCreated || activeLesson) return;
@@ -323,6 +345,19 @@ export function CurrentWorkspace() {
     setNotebookOpen(true);
   };
 
+  const recordClassroomAttempt = (result: Evaluation) => {
+    if (!classroomPreviewStudentId) return;
+    const student = classroomStudents.find((candidate) => candidate.id === classroomPreviewStudentId);
+    if (!student) return;
+    setClassroomStudentEvidence((current) => {
+      const previous = current[student.id];
+      return {
+        ...current,
+        [student.id]: classroomEvidenceAfterRecall(student, previous, result),
+      };
+    });
+  };
+
   const acceptRecallEvaluation = (result: Evaluation) => {
     const passed = result.score >= 75;
     setEvaluation(result);
@@ -350,6 +385,7 @@ export function CurrentWorkspace() {
         preferredSupport,
       };
     });
+    recordClassroomAttempt(result);
   };
 
   const evaluateRecall = async () => {
@@ -464,6 +500,7 @@ export function CurrentWorkspace() {
     setSourcesOpen(false);
     setSidebarOpen(false);
     setActiveReviewId(null);
+    setClassroomPreviewStudentId(null);
     setWorkspaceView("map");
   };
 
@@ -472,6 +509,7 @@ export function CurrentWorkspace() {
     setSourcesOpen(false);
     setSidebarOpen(false);
     setActiveReviewId(null);
+    setClassroomPreviewStudentId(null);
     setWorkspaceView("classroom");
   };
 
@@ -511,12 +549,48 @@ export function CurrentWorkspace() {
     }));
     setActivePathId(path.id);
     setActiveConceptIndex(0);
+    setClassroomPreviewStudentId(student.id);
     resetLessonActivity("read");
     setSourcesOpen(false);
     setNotebookOpen(false);
     setSidebarOpen(false);
     setWorkspaceView("lesson");
     window.requestAnimationFrame(() => lessonScrollRef.current?.scrollTo({ top: 0 }));
+  };
+
+  const assignClassroomSupportReview = () => {
+    const dueAt = new Date().toISOString();
+    const assigned = classroomRoster.filter((student) => student.status === "needs_support").map((student) => ({
+      id: `classroom-support-review-${student.id}`,
+      pathId: classroomPathId(student.id),
+      conceptIndex: 0,
+      dueAt,
+      memory: { intervalDays: 1, ease: 2.5, repetitions: 0 },
+      reason: "research" as const,
+    }));
+    setReviews((current) => [...current.filter((review) => !review.id.startsWith("classroom-support-review-")), ...assigned]);
+  };
+
+  const updateClassroomCurriculum = (status: ClassroomUpdateStatus) => {
+    setClassroomUpdateStatus(status);
+    setCustomPaths((current) => current.map((path) => {
+      if (!path.classroomStudentId) return path;
+      const student = classroomRoster.find((candidate) => candidate.id === path.classroomStudentId);
+      return student ? classroomPathForStudent(student, status === "applied") : path;
+    }));
+    setReviews((current) => {
+      const withoutCurriculumReviews = current.filter((review) => !review.id.startsWith("classroom-curriculum-review-"));
+      if (status !== "applied") return withoutCurriculumReviews;
+      const dueAt = new Date().toISOString();
+      return [...withoutCurriculumReviews, ...classroomRoster.map((student) => ({
+        id: `classroom-curriculum-review-${student.id}`,
+        pathId: classroomPathId(student.id),
+        conceptIndex: 3,
+        dueAt,
+        memory: { intervalDays: 1, ease: 2.5, repetitions: 0 },
+        reason: "research" as const,
+      }))];
+    });
   };
 
   const resetDemo = async () => {
@@ -549,6 +623,9 @@ export function CurrentWorkspace() {
     setNotebookOpen(false);
     setActiveArtifactSource(null);
     setClassroomUpdateStatus("ready");
+    setClassroomNavigation(defaultClassroomNavigation);
+    setClassroomStudentEvidence({});
+    setClassroomPreviewStudentId(null);
     resetLessonActivity("read");
     setWorkspaceView("lesson");
   };
@@ -740,10 +817,15 @@ export function CurrentWorkspace() {
       <main className="learning-canvas">
         {workspaceView === "classroom" ? (
           <ClassroomWorkspace
+            students={classroomRoster}
+            navigation={classroomNavigation}
+            onNavigationChange={setClassroomNavigation}
             onOpenLearningMap={openLearningMap}
             onPreviewStudent={openClassroomStudent}
             updateStatus={classroomUpdateStatus}
-            onSetUpdateStatus={setClassroomUpdateStatus}
+            onSetUpdateStatus={updateClassroomCurriculum}
+            supportReviewAssigned={supportReviewAssigned}
+            onAssignSupportReview={assignClassroomSupportReview}
           />
         ) : workspaceView === "map" ? (
           <LearningMap
@@ -801,7 +883,14 @@ export function CurrentWorkspace() {
               <button className={`notebook-toggle ${notebookOpen ? "active" : ""}`} aria-label={notebookOpen ? "Close notebook" : "Open notebook"} aria-pressed={notebookOpen} onClick={() => setNotebookOpen((value) => !value)}><NotebookPen size={15} /><span>Notes</span></button>
             </div>
 
-            <div className="lesson-scroll" ref={lessonScrollRef}>
+            {classroomPreviewStudent ? (
+              <div className="classroom-preview-bar" role="status">
+                <span><School size={14} /><strong>Previewing {classroomPreviewStudent.name}</strong><small>{classroomPreviewStudent.interest} context · activity updates the classroom demo</small></span>
+                <button onClick={openClassroom}>Return to Classroom <ArrowRight size={13} /></button>
+              </div>
+            ) : null}
+
+            <div className={`lesson-scroll ${classroomPreviewStudent ? "with-classroom-preview" : ""}`} ref={lessonScrollRef}>
               <div className="mode-stage">
                 {activePath.userCreated && !activeLesson ? (
                   <LessonGenerationModule state={lessonGeneration?.key === conceptKey ? lessonGeneration : null} retry={retryLessonGeneration} />
@@ -914,6 +1003,42 @@ function sanitizeProgress(value: unknown): Record<string, PathProgress> {
 function sanitizeTextRecord(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object") return {};
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}
+
+function sanitizeClassroomNavigation(value: unknown): ClassroomNavigationState {
+  if (!value || typeof value !== "object") return defaultClassroomNavigation;
+  const navigation = value as Partial<ClassroomNavigationState>;
+  const selectedStudentId = classroomStudents.some((student) => student.id === navigation.selectedStudentId)
+    ? navigation.selectedStudentId as string
+    : defaultClassroomNavigation.selectedStudentId;
+  return {
+    view: navigation.view === "students" || navigation.view === "updates" ? navigation.view : "overview",
+    selectedStudentId,
+    studentQuery: typeof navigation.studentQuery === "string" ? navigation.studentQuery.slice(0, 80) : "",
+    attentionOnly: Boolean(navigation.attentionOnly),
+  };
+}
+
+function sanitizeClassroomEvidence(value: unknown): Record<string, ClassroomStudentEvidence> {
+  if (!value || typeof value !== "object") return {};
+  const evidence: Record<string, ClassroomStudentEvidence> = {};
+  for (const [studentId, candidate] of Object.entries(value)) {
+    if (!classroomStudents.some((student) => student.id === studentId) || !candidate || typeof candidate !== "object") continue;
+    const item = candidate as Partial<ClassroomStudentEvidence>;
+    if (typeof item.mastery !== "number" || typeof item.completedConcepts !== "number" || typeof item.lastActive !== "string") continue;
+    if (item.status !== "on_track" && item.status !== "needs_support" && item.status !== "ahead") continue;
+    if (item.misconception !== null && typeof item.misconception !== "string") continue;
+    evidence[studentId] = {
+      mastery: Math.max(0, Math.min(100, Math.round(item.mastery))),
+      completedConcepts: Math.max(0, Math.min(4, Math.round(item.completedConcepts))),
+      status: item.status,
+      lastActive: item.lastActive.slice(0, 40),
+      misconception: item.misconception,
+      recallAttempts: typeof item.recallAttempts === "number" ? Math.max(0, Math.round(item.recallAttempts)) : 0,
+      lastScore: typeof item.lastScore === "number" ? Math.max(0, Math.min(100, Math.round(item.lastScore))) : null,
+    };
+  }
+  return evidence;
 }
 
 function sanitizeLearnerProfile(value: unknown): LearnerProfile {
