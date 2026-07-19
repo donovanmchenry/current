@@ -311,6 +311,8 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(workspace, /url\.searchParams\.set\("view", "student"\)/);
   assert.match(workspace, /openClassroomStudent\(student, assignment,[\s\S]*"student"\)/);
   assert.match(workspace, /isStudentSession \? "Close session" : "Return to Classroom"/);
+  assert.match(workspace, /window\.addEventListener\("storage", receiveClassroomEvidence\)/);
+  assert.match(workspace, /window\.localStorage\.setItem\(classroomEvidenceEventKey/);
   assert.match(styles, /\.track-title\.student-session-track[^}]*cursor:\s*default/s);
   assert.match(workspace, /classroomUpdateStatus,[\s\S]*classroomNavigation,[\s\S]*classroomStudentEvidence/);
   assert.match(workspace, /classroom-curriculum-review-/);

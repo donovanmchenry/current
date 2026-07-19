@@ -45,6 +45,7 @@ import {
   type ClassroomStudentEvidence,
 } from "../lib/classroom-catalog";
 import { basePaths, suggestedPath } from "../lib/learning-catalog";
+import { classroomEvidenceEvent, classroomEvidenceEventKey, parseClassroomEvidenceEvent } from "../lib/classroom-sync";
 import type { GeneratedLesson, LearningConcept, LearningPath, LearningSource, LessonApplication, SourceSnapshot, SourceUpdateProposal } from "../lib/learning-path";
 import { currentModelLabel, type CurrentModelId } from "../lib/model-routing";
 import {
@@ -335,6 +336,21 @@ export function CurrentWorkspace() {
   }, [activePath.id, checkedSources, classroomAssignments, classroomClasses, classroomCustomStudents, classroomNavigation, classroomStudentEvidence, classroomUpdateStatus, conceptMemories, customPaths, learnerProfile, notesByConcept, progress, queue, reflectionsByConcept, researchUpdateApplied, reviews, safeConceptIndex, sourceUpdates, suggestedPathAdded]);
 
   useEffect(() => {
+    const receiveClassroomEvidence = (event: StorageEvent) => {
+      if (event.key !== classroomEvidenceEventKey) return;
+      const message = parseClassroomEvidenceEvent(event.newValue);
+      if (!message) return;
+      setClassroomStudentEvidence((current) => {
+        const previous = current[message.evidenceKey];
+        if (previous && JSON.stringify(previous) === JSON.stringify(message.evidence)) return current;
+        return { ...current, [message.evidenceKey]: message.evidence };
+      });
+    };
+    window.addEventListener("storage", receiveClassroomEvidence);
+    return () => window.removeEventListener("storage", receiveClassroomEvidence);
+  }, []);
+
+  useEffect(() => {
     if (workspaceView !== "lesson" || !activePath.userCreated || activeLesson) return;
     const requestKey = `${activePath.id}:${safeConceptIndex}:${lessonRetryToken}`;
     if (lessonRequestKey.current === requestKey) return;
@@ -400,9 +416,15 @@ export function CurrentWorkspace() {
     const evidenceKey = classroomEvidenceKey(classroomPreview.assignmentId, student.id);
     setClassroomStudentEvidence((current) => {
       const previous = current[evidenceKey];
+      const evidence = classroomEvidenceAfterRecall(student, previous, result);
+      try {
+        window.localStorage.setItem(classroomEvidenceEventKey, JSON.stringify(classroomEvidenceEvent(evidenceKey, evidence)));
+      } catch {
+        // The in-memory attempt still succeeds when browser storage is unavailable.
+      }
       return {
         ...current,
-        [evidenceKey]: classroomEvidenceAfterRecall(student, previous, result),
+        [evidenceKey]: evidence,
       };
     });
   };
@@ -753,6 +775,7 @@ export function CurrentWorkspace() {
     await clearSourceArtifacts();
     [
       runtimeStorageKey,
+      classroomEvidenceEventKey,
       "current-notebook-v2",
       "current-reflection-v1",
       "current-learning-map-v1",

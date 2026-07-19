@@ -75,6 +75,7 @@ The MVP is complete when a judge can provide a source, receive a live GPT-5.6-ge
 - [x] Let teachers create rostered classes and assign any existing Current path with a due date.
 - [x] Keep classes, assignments, rosters, and assignment-scoped evidence on the device.
 - [x] Launch a separate student-labeled assignment session from the teacher workspace.
+- [x] Synchronize assignment-scoped recall evidence back to an open teacher roster without sharing the entire application snapshot.
 
 ## Phase 1: Personal Current
 

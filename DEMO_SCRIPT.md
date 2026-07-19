@@ -53,8 +53,9 @@ Slope compares the change in output with the change in input. It is a rate per o
 4. Keep the prepared responses available for quick paste and close unrelated browser tabs.
 5. Record at a viewport where the learning path, lesson, and active side panel are readable without zooming.
 6. Confirm Classroom opens with Jordan selected and the pending update restored before recording that segment.
-7. Record the Use sample path generation separately and cut from the populated form to the Sol-labeled outline so the main take does not wait on generation.
-8. Keep the exported video below 2:55, publish it publicly on YouTube, and verify audio before submitting.
+7. Launch Jordan's student session, submit the prepared recall in that tab, and confirm the already-open teacher roster updates without a reload.
+8. Record the Use sample path generation separately and cut from the populated form to the Sol-labeled outline so the main take does not wait on generation.
+9. Keep the exported video below 2:55, publish it publicly on YouTube, and verify audio before submitting.
 
 ## Submission checklist
 

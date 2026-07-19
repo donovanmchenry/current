@@ -11,6 +11,7 @@ import {
   classroomStudentsWithEvidence,
 } from "../lib/classroom-catalog.ts";
 import { basePaths } from "../lib/learning-catalog.ts";
+import { classroomEvidenceEvent, parseClassroomEvidenceEvent } from "../lib/classroom-sync.ts";
 
 test("isolates each student in a distinct classroom path", () => {
   const jordan = classroomStudents.find((student) => student.id === "jordan-brooks");
@@ -99,4 +100,21 @@ test("keeps classroom evidence scoped to the assignment", () => {
   assert.equal(assignmentA.status, "needs_support");
   assert.equal(assignmentB.lastScore, undefined);
   assert.equal(assignmentB.status, student.status);
+});
+
+test("transports only a validated classroom evidence record between tabs", () => {
+  const evidence = {
+    mastery: 71,
+    completedConcepts: 2,
+    status: "on_track",
+    lastActive: "Just now",
+    misconception: null,
+    recallAttempts: 2,
+    lastScore: 84,
+  };
+  const event = classroomEvidenceEvent("assignment-a:maya-chen", evidence);
+
+  assert.deepEqual(parseClassroomEvidenceEvent(JSON.stringify(event)), event);
+  assert.equal(parseClassroomEvidenceEvent('{"evidenceKey":"assignment-a:maya-chen","evidence":{"mastery":"high"}}'), null);
+  assert.equal(parseClassroomEvidenceEvent('{"evidenceKey":"unsafe","evidence":{}}'), null);
 });
