@@ -154,6 +154,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: route.model,
         reasoning: { effort: route.reasoningEffort },
+        store: false,
         input: [
           {
             role: "system",

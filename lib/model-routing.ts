@@ -2,8 +2,8 @@ export const currentModelRoutes = {
   pathPlanner: {
     model: "gpt-5.6-sol",
     label: "GPT-5.6 Sol",
-    reasoningEffort: "high",
-    purpose: "Design a coherent, source-grounded curriculum architecture.",
+    reasoningEffort: "medium",
+    purpose: "Design a coherent, source-grounded curriculum without making path creation wait on maximum deliberation.",
   },
   lessonAuthor: {
     model: "gpt-5.6-terra",

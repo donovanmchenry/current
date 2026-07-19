@@ -8,7 +8,6 @@
 
 <p align="center">
   <a href="https://current-learning-lab.vanzm.chatgpt.site">Open Current</a> ·
-  <a href="./DEMO_SCRIPT.md">Demo script</a> ·
   <a href="./ROADMAP.md">Roadmap</a>
 </p>
 
@@ -53,7 +52,7 @@ Current routes work by task shape. The policy lives in [`lib/model-routing.ts`](
 
 | Workload | Route | Design decision |
 | --- | --- | --- |
-| Learning-path architecture | `gpt-5.6-sol`, high | Quality-first reasoning for prerequisites, sequence, objectives, and source coverage. |
+| Learning-path architecture | `gpt-5.6-sol`, medium | Balanced reasoning for prerequisites, sequence, objectives, and source coverage without turning path creation into a long-running job. |
 | Research-source updates | `gpt-5.6-sol`, high | Curriculum changes deserve the strongest judgment and still require human approval. |
 | Lesson authoring | `gpt-5.6-terra`, medium | Strong generation with a better cost profile for one lesson per concept. |
 | Recall and application coaching | `gpt-5.6-luna`, low | Fast structured evaluation for the highest-volume interaction in the product. |

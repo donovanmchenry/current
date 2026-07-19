@@ -814,8 +814,11 @@ export function CurrentWorkspace() {
 
   const openLesson = (pathId = activePath.id, conceptIndex = safeConceptIndex, nextMode: Mode = "read") => {
     const path = paths.find((candidate) => candidate.id === pathId) ?? activePath;
-    const nextConceptIndex = Math.max(0, Math.min(path.concepts.length - 1, conceptIndex));
     const pathProgress = progressForPath(path, progress[path.id]);
+    const requestedConceptIndex = Math.max(0, Math.min(path.concepts.length - 1, conceptIndex));
+    const nextConceptIndex = pathProgress.completedConceptIndexes.includes(requestedConceptIndex) || requestedConceptIndex === pathProgress.currentConceptIndex
+      ? requestedConceptIndex
+      : pathProgress.currentConceptIndex;
     setActivePathId(path.id);
     setActiveConceptIndex(nextConceptIndex);
     if (!pathProgress.completedConceptIndexes.includes(nextConceptIndex)) {
@@ -965,9 +968,10 @@ export function CurrentWorkspace() {
         <ol className="concept-path">
           {activePath.concepts.map((concept, index) => {
             const conceptStatus = activeProgress.completedConceptIndexes.includes(index) ? "done" : index === activeProgress.currentConceptIndex ? "current" : "locked";
+            const conceptLocked = conceptStatus === "locked";
             return (
             <li className={`${conceptStatus} ${safeConceptIndex === index ? "selected" : ""}`} key={concept.title}>
-              <button className="concept-row" aria-current={safeConceptIndex === index ? "page" : undefined} onClick={() => openLesson(activePath.id, index)}>
+              <button className="concept-row" aria-current={safeConceptIndex === index ? "page" : undefined} disabled={conceptLocked} onClick={() => openLesson(activePath.id, index)}>
                 <span className="concept-state">{conceptStatus === "done" ? <Check size={11} /> : index + 1}</span>
                 <span>{concept.title}</span>
                 {conceptStatus === "current" ? <span className="now-label">Now</span> : null}

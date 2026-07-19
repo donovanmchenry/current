@@ -532,7 +532,7 @@ export function LearningMap({
                 </ul>
               </div>
             ) : null}
-            <button className="rail-primary-action" onClick={() => onOpenLesson(selectedPath.id, inspectedConceptIndex)}><BookOpen size={14} /> {inspectedConceptState === "done" ? "Review" : inspectedConceptState === "current" && selectedPathIsActive ? "Continue" : "Start"} {inspectedConcept.title}</button>
+            <button className="rail-primary-action" disabled={inspectedConceptState === "upcoming"} onClick={() => onOpenLesson(selectedPath.id, inspectedConceptIndex)}><BookOpen size={14} /> {inspectedConceptState === "done" ? "Review" : inspectedConceptState === "current" && selectedPathIsActive ? "Continue" : inspectedConceptState === "upcoming" ? "Complete prior concepts to open" : "Start"} {inspectedConcept.title}</button>
             {selectedPath.id !== activePathId ? (
               <button className="rail-queue-action" onClick={() => onQueuePath(selectedPath.id)}><Clock3 size={13} />{queue.includes(selectedPath.id) ? "Remove from queue" : "Set as next"}</button>
             ) : null}

@@ -20,7 +20,7 @@ The MVP is complete when a judge can provide a source, receive a live GPT-5.6-ge
 ### Live OpenAI experience
 
 - Configure `OPENAI_API_KEY` for the hosted Sites deployment.
-- Verify that path generation and recall evaluation use GPT-5.6 Sol in production.
+- Verify that path generation uses GPT-5.6 Sol and recall evaluation uses GPT-5.6 Luna in production.
 - Preserve deterministic fallback behavior for a reliable demo, while making live and fallback execution distinguishable during development.
 
 ### Dynamic user-created lessons

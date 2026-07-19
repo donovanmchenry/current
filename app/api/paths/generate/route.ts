@@ -419,13 +419,13 @@ export async function POST(request: Request) {
   try {
     const route = currentModelRoutes.pathPlanner;
     const sourceSections = [
-      ...fetched.map((source) => `Source ID: ${source.id}\nSource link: ${source.title}\nURL: ${source.url}\n${source.text.slice(0, 16_000)}`),
-      ...textFiles.map((source) => `Source ID: ${source.id}\nSource file: ${source.name}\n${source.text.slice(0, 16_000)}`),
+      ...fetched.map((source) => `Source ID: ${source.id}\nSource link: ${source.title}\nURL: ${source.url}\n${source.text.slice(0, 8_000)}`),
+      ...textFiles.map((source) => `Source ID: ${source.id}\nSource file: ${source.name}\n${source.text.slice(0, 8_000)}`),
     ];
     const content: Array<Record<string, string>> = [
       {
         type: "input_text",
-        text: `Subject: ${subject}\nLearner goal: ${goal}\n\nAvailable source material:\n${sourceSections.join("\n\n").slice(0, 80_000) || "No extractable source text was supplied."}`,
+        text: `Subject: ${subject}\nLearner goal: ${goal}\n\nAvailable source material:\n${sourceSections.join("\n\n").slice(0, 32_000) || "No extractable source text was supplied."}`,
       },
     ];
 
@@ -437,12 +437,13 @@ export async function POST(request: Request) {
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
+      signal: AbortSignal.timeout(30_000),
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
         model: route.model,
         reasoning: { effort: route.reasoningEffort },
         store: false,
-        max_output_tokens: 2200,
+        max_output_tokens: 8000,
         input: [
           {
             role: "system",

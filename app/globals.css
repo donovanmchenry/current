@@ -52,7 +52,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { min-height: 100%; }
+html, body { width: 100%; max-width: 100%; min-height: 100%; }
 body {
   margin: 0;
   overflow: hidden;
@@ -71,7 +71,7 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 ::selection { color: var(--text); background: hsl(var(--primary) / .3); }
 :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 
-.current-app { min-height: 100vh; background: var(--bg); }
+.current-app { width: 100%; max-width: 100%; min-height: 100vh; overflow: hidden; background: var(--bg); }
 .current-app.map-view .course-sidebar { display: none; }
 .current-app.map-view .learning-canvas { left: 0; right: 0; }
 .current-app.classroom-view .course-sidebar { display: none; }
@@ -120,6 +120,8 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .concept-row { width: 100%; min-height: 43px; display: grid; grid-template-columns: 25px 1fr auto; align-items: center; gap: 7px; border: 0; border-radius: var(--radius); padding: 0 8px; color: var(--text-secondary); background: transparent; font-size: 13px; text-align: left; cursor: pointer; }
 .concept-row:hover { color: var(--text); background: #181818; }
 .concept-row:focus-visible { outline: 0; box-shadow: inset 0 0 0 1px hsl(var(--ring) / .65); }
+.concept-row:disabled { color: #777; cursor: not-allowed; }
+.concept-row:disabled:hover { color: #777; background: transparent; }
 .concept-path li.current .concept-row { color: var(--text); }
 .concept-path li.selected .concept-row { color: var(--text); background: #202020; }
 .concept-path li.locked:not(.selected) .concept-row { color: #777; }
@@ -178,6 +180,8 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
   left: var(--sidebar);
   right: 0;
   min-width: 0;
+  max-width: 100vw;
+  overflow: hidden;
   background: var(--bg);
   transition: right .42s cubic-bezier(.22, 1, .36, 1);
 }
@@ -210,7 +214,7 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .notebook-toggle { min-height: 31px; display: inline-flex; align-items: center; justify-self: end; gap: 6px; border: 0; border-radius: 8px; padding: 0 9px; color: var(--text-secondary); background: transparent; font-size: 12px; cursor: pointer; }
 .notebook-toggle:hover, .notebook-toggle.active { color: var(--text); background: #202020; }
 .concept-toolbar-title { max-width: 360px; overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.lesson-scroll { position: absolute; inset: 0; overflow-y: auto; padding-top: 54px; overscroll-behavior: contain; scrollbar-color: #555 transparent; }
+.lesson-scroll { position: absolute; inset: 0; width: 100%; min-width: 0; overflow-x: hidden; overflow-y: auto; padding-top: 54px; overscroll-behavior: contain; scrollbar-color: #555 transparent; }
 .lesson-scroll.with-classroom-preview { padding-top: 96px; }
 .classroom-preview-bar { position: absolute; z-index: 9; top: 54px; right: 0; left: 0; min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 7px 16px; color: var(--text-secondary); background: #101010; box-shadow: inset 0 1px 0 hsl(var(--foreground) / .055), inset 0 -1px 0 hsl(var(--foreground) / .055); }
 .classroom-preview-bar > span { min-width: 0; display: flex; align-items: center; gap: 7px; }
@@ -222,8 +226,9 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .classroom-preview-bar.student-session { background: #0d1117; }
 .classroom-preview-bar.student-session > span > svg { color: #61a8ff; }
 .classroom-preview-bar.classroom-session-error > span > svg { color: #ef8f8f; }
-.mode-stage { min-height: 100%; }
-.lesson-module { width: min(720px, calc(100% - 48px)); margin: 0 auto; padding: 40px 0 64px; }
+.mode-stage { width: 100%; min-width: 0; min-height: 100%; }
+.lesson-module { width: min(720px, calc(100% - 48px)); min-width: 0; max-width: 100%; margin: 0 auto; padding: 40px 0 64px; overflow-wrap: anywhere; }
+.lesson-module > *, .module-header, .reading-section, .source-excerpt, .comparison-row, .concept-diagram { min-width: 0; max-width: 100%; }
 .lesson-generation-state { min-height: calc(100vh - 54px); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding-block: 64px; }
 .lesson-generation-mark { width: 36px; height: 36px; display: grid; place-items: center; margin-bottom: 18px; border-radius: 8px; color: var(--accent-bright); background: var(--accent-soft); }
 .lesson-generation-state h1 { margin: 0; font-size: 24px; font-weight: 500; }
@@ -554,6 +559,8 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .selected-path-sources small { margin-top: 2px; color: var(--text-muted); font-size: 8px; }
 .rail-primary-action { width: 100%; min-height: 34px; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 15px; border: 0; border-radius: 8px; color: #111; background: #f2f2f2; font-size: 11px; font-weight: 560; cursor: pointer; }
 .rail-primary-action:hover { background: #dcdcdc; }
+.rail-primary-action:disabled { color: var(--text-muted); background: #1b1b1b; cursor: not-allowed; }
+.rail-primary-action:disabled:hover { background: #1b1b1b; }
 .rail-queue-action { width: 100%; min-height: 31px; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; border: 0; border-radius: 7px; color: var(--text-secondary); background: #1b1b1b; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .07); font-size: 10px; cursor: pointer; }
 .rail-queue-action:hover { color: var(--text); background: #232323; }
 .remove-path-button { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; border: 0; padding: 5px 0; color: var(--text-muted); background: transparent; font-size: 9px; cursor: pointer; }
@@ -936,7 +943,7 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
   .course-sidebar { z-index: 60; top: 0; width: 248px; transform: translateX(-100%); transition: transform .18s ease; box-shadow: 12px 0 30px rgba(0,0,0,.3); }
   .course-sidebar.open { transform: translateX(0); }
   .overlay { display: block; position: fixed; z-index: 55; inset: 0; border: 0; background: rgba(0,0,0,.5); }
-  .learning-canvas { left: 0; }
+  .learning-canvas { right: 0; left: 0; width: 100%; max-width: 100vw; }
   .notebook-overlay { left: 0; }
   .lesson-toolbar { grid-template-columns: auto 1fr auto; padding-inline: 9px; }
   .learning-map-shell { display: flex; flex-direction: column; }
@@ -978,7 +985,7 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
   .mode-switcher button { min-width: 47px; justify-content: center; gap: 4px; padding: 0 6px; font-size: 11px; }
   .notebook-toggle { padding-inline: 6px; }
   .concept-toolbar-title { max-width: 150px; justify-self: center; font-size: 11px; }
-  .lesson-module { width: min(100% - 30px, 720px); padding-top: 31px; }
+  .lesson-module { width: min(720px, calc(100% - 30px)); padding-top: 31px; }
   .module-header h1 { font-size: 26px; }
   .module-header > p { font-size: 14px; }
   .concept-diagram { grid-template-columns: 1fr; }
