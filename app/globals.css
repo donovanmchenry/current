@@ -96,6 +96,9 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .sidebar-brand { min-height: 54px; display: flex; align-items: center; justify-content: space-between; margin: 0 -9px 14px; padding: 0 18px; border-bottom: 0; color: var(--text); font-family: "OpenAI Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 20px; font-weight: 600; }
 .sidebar-wordmark { display: inline-flex; align-items: center; gap: 8px; }
 .sidebar-wordmark img { width: 20px; height: 20px; display: block; flex: 0 0 auto; }
+.sidebar-brand-actions { display: inline-flex; align-items: center; gap: 3px; }
+.workspace-switch-link { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--text-muted); text-decoration: none; }
+.workspace-switch-link:hover { color: var(--text); background: var(--bg-hover); }
 .sidebar-bottom button { position: relative; z-index: 2; width: 100%; min-height: 34px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border: 1px solid transparent; border-radius: calc(var(--radius) - 1px); color: var(--text-secondary); background: var(--bg-deep); font-size: 13px; text-align: left; cursor: pointer; }
 .sidebar-bottom button:hover { color: var(--text); background: var(--bg-hover); }
 .track-title { width: 100%; display: grid; grid-template-columns: 31px 1fr 14px; align-items: center; gap: 8px; border: 0; border-radius: 8px; padding: 5px 9px; color: var(--text); background: transparent; text-align: left; cursor: pointer; }
@@ -109,11 +112,6 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .track-title small { margin-top: 2px; color: var(--text-muted); font-size: 11px; }
 .track-title.student-session-track { grid-template-columns: 31px minmax(0, 1fr); cursor: default; }
 .track-title.student-session-track:hover { background: transparent; }
-.classroom-sidebar-entry { width: 100%; min-height: 37px; display: grid; grid-template-columns: 31px minmax(0, 1fr) 14px; align-items: center; gap: 8px; margin-top: 5px; border: 0; border-radius: 8px; padding: 4px 9px; color: var(--text-secondary); background: transparent; text-align: left; cursor: pointer; }
-.classroom-sidebar-entry:hover { color: var(--text); background: var(--bg-hover); }
-.classroom-sidebar-entry > span { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 8px; color: var(--text-muted); }
-.classroom-sidebar-entry strong { font-size: 12px; font-weight: 530; }
-.classroom-sidebar-entry > svg { color: var(--text-muted); }
 .concept-path { position: relative; display: grid; gap: 2px; margin: 18px 0 0; padding: 0; list-style: none; }
 .concept-path::before { content: ""; position: absolute; left: 17px; top: 18px; bottom: 18px; width: 1px; background: var(--line); }
 .concept-path li { position: relative; z-index: 1; }
@@ -370,8 +368,6 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
 .map-toolbar-title { display: inline-flex; align-items: center; gap: 6px; }
 .map-toolbar-title > svg { color: var(--text-muted); }
 .map-toolbar-end { position: relative; justify-self: end; display: flex; align-items: center; gap: 4px; }
-.map-classroom-link { min-height: 29px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; padding: 0 8px; color: var(--text-muted); background: transparent; font-size: 10px; cursor: pointer; }
-.map-classroom-link:hover { color: var(--text); background: #1b1b1b; }
 .map-reset-trigger { min-height: 29px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; padding: 0 8px; color: var(--text-muted); background: transparent; font-size: 10px; cursor: pointer; }
 .map-reset-trigger:hover { color: var(--text-secondary); background: #1b1b1b; }
 .map-reset-confirm { min-height: 34px; display: flex; align-items: center; gap: 5px; border-radius: 7px; padding: 3px 3px 3px 9px; color: var(--text-secondary); background: #1b1b1b; box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .08), 0 10px 26px rgba(0,0,0,.28); font-size: 9px; white-space: nowrap; }
@@ -951,7 +947,6 @@ code, pre, kbd { font-family: var(--font-geist-mono), monospace; letter-spacing:
   .map-toolbar-start { grid-column: 1; grid-row: 1; }
   .map-toolbar-end { grid-column: 1; grid-row: 1; }
   .map-reset-trigger span { display: none; }
-  .map-classroom-link span { display: none; }
   .map-wordmark { gap: 7px; }
   .map-wordmark strong { display: block; font-size: 13px; }
   .map-toolbar-divider, .map-toolbar-title { display: none; }

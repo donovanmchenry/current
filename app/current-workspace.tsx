@@ -98,6 +98,10 @@ type ClassroomSession = {
   mode: "teacher-preview" | "student";
 };
 
+type CurrentWorkspaceProps = {
+  initialView?: WorkspaceView;
+};
+
 const modeItems: { id: Mode; label: string; icon: typeof BookOpen }[] = [
   { id: "read", label: "Read", icon: BookOpen },
   { id: "recall", label: "Recall", icon: Brain },
@@ -164,8 +168,8 @@ function applyCheckedSources(paths: LearningPath[], checkedSources: CheckedSourc
   }));
 }
 
-export function CurrentWorkspace() {
-  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("lesson");
+export function CurrentWorkspace({ initialView = "lesson" }: CurrentWorkspaceProps) {
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>(initialView);
   const [customPaths, setCustomPaths] = useState<LearningPath[]>([]);
   const [suggestedPathAdded, setSuggestedPathAdded] = useState(false);
   const [activePathId, setActivePathId] = useState("long-running");
@@ -575,13 +579,17 @@ export function CurrentWorkspace() {
     setWorkspaceView("map");
   };
 
-  const openClassroom = () => {
+  const returnToClassroom = () => {
     setNotebookOpen(false);
     setSourcesOpen(false);
     setSidebarOpen(false);
     setActiveReviewId(null);
     setClassroomPreview(null);
     setWorkspaceView("classroom");
+  };
+
+  const openPersonalWorkspace = () => {
+    window.location.assign("/");
   };
 
   const resetLessonActivity = useCallback((nextMode: Mode) => {
@@ -951,7 +959,10 @@ export function CurrentWorkspace() {
             <img src="/current-icon.png" width="20" height="20" alt="" aria-hidden="true" />
             Current
           </span>
-          <button className="icon-action mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button>
+          <span className="sidebar-brand-actions">
+            {!isStudentSession && initialView !== "classroom" ? <a className="workspace-switch-link" href="/classroom" aria-label="Open Current Classroom" title="Open Current Classroom"><School size={15} /></a> : null}
+            <button className="icon-action mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button>
+          </span>
         </div>
         {isStudentSession ? <div className="track-title student-session-track">
           <span className="track-icon"><BookOpen size={16} /></span>
@@ -961,10 +972,6 @@ export function CurrentWorkspace() {
           <div><strong>{activePath.title}</strong><small>{activePath.concepts.length} concepts</small></div>
           <ChevronRight size={14} />
         </button>}
-        {!isStudentSession ? <button className="classroom-sidebar-entry" onClick={openClassroom}>
-          <span><School size={15} /></span><strong>Classroom</strong><ChevronRight size={14} />
-        </button> : null}
-
         <ol className="concept-path">
           {activePath.concepts.map((concept, index) => {
             const conceptStatus = activeProgress.completedConceptIndexes.includes(index) ? "done" : index === activeProgress.currentConceptIndex ? "current" : "locked";
@@ -1017,7 +1024,7 @@ export function CurrentWorkspace() {
             onNavigationChange={setClassroomNavigation}
             onCreateClass={createClassroomClass}
             onCreateAssignment={createClassroomAssignment}
-            onOpenLearningMap={openLearningMap}
+            onOpenPersonalWorkspace={openPersonalWorkspace}
             onPreviewStudent={openClassroomStudent}
             onLaunchStudentSession={launchClassroomStudentSession}
             updateStatus={classroomUpdateStatus}
@@ -1049,7 +1056,6 @@ export function CurrentWorkspace() {
             onSourceChecked={storeCheckedSource}
             onOpenSource={setActiveArtifactSource}
             onResetDemo={resetDemo}
-            onOpenClassroom={openClassroom}
           />
         ) : (
           <>
@@ -1084,7 +1090,7 @@ export function CurrentWorkspace() {
             {classroomPreviewStudent ? (
               <div className={`classroom-preview-bar ${isStudentSession ? "student-session" : ""}`} role="status">
                 <span><School size={14} /><strong>{isStudentSession ? `${classroomPreviewStudent.name}'s assignment` : `Previewing ${classroomPreviewStudent.name}`}</strong><small>{isStudentSession ? `${classroomPreviewAssignment?.title ?? activePath.title} · your work is saved to this assignment` : `${classroomPreviewStudent.interest} context · activity updates the classroom roster`}</small></span>
-                <button onClick={isStudentSession ? closeStudentSession : openClassroom}>{isStudentSession ? "Close session" : "Return to Classroom"} <ArrowRight size={13} /></button>
+                <button onClick={isStudentSession ? closeStudentSession : returnToClassroom}>{isStudentSession ? "Close session" : "Return to Classroom"} <ArrowRight size={13} /></button>
               </div>
             ) : studentSessionError ? <div className="classroom-preview-bar classroom-session-error" role="alert"><span><CircleHelp size={14} /><strong>{studentSessionError}</strong></span><button onClick={() => setStudentSessionError("")}>Dismiss</button></div> : null}
 

@@ -9,7 +9,6 @@ import {
   ExternalLink,
   Filter,
   GraduationCap,
-  Network,
   Plus,
   Search,
   ShieldCheck,
@@ -36,7 +35,7 @@ type ClassroomWorkspaceProps = {
   onNavigationChange: (state: ClassroomNavigationState) => void;
   onCreateClass: (input: NewClassInput) => void;
   onCreateAssignment: (input: NewAssignmentInput) => void;
-  onOpenLearningMap: () => void;
+  onOpenPersonalWorkspace: () => void;
   onPreviewStudent: (student: ClassroomStudent, assignment: ClassroomAssignment, curriculumUpdateApplied: boolean) => void;
   onLaunchStudentSession: (student: ClassroomStudent, assignment: ClassroomAssignment) => void;
   updateStatus: ClassroomUpdateStatus;
@@ -62,7 +61,7 @@ function formatAssignmentDate(value: string) {
   return Number.isNaN(date.getTime()) ? "Unscheduled" : new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
 }
 
-export function ClassroomWorkspace({ classes, assignments, students, activeClass, activeAssignment, assignmentPath, availablePaths, navigation, onNavigationChange, onCreateClass, onCreateAssignment, onOpenLearningMap, onPreviewStudent, onLaunchStudentSession, updateStatus, onSetUpdateStatus, supportReviewAssigned, onAssignSupportReview }: ClassroomWorkspaceProps) {
+export function ClassroomWorkspace({ classes, assignments, students, activeClass, activeAssignment, assignmentPath, availablePaths, navigation, onNavigationChange, onCreateClass, onCreateAssignment, onOpenPersonalWorkspace, onPreviewStudent, onLaunchStudentSession, updateStatus, onSetUpdateStatus, supportReviewAssigned, onAssignSupportReview }: ClassroomWorkspaceProps) {
   const [createClassOpen, setCreateClassOpen] = useState(false);
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
   const { view, selectedStudentId, studentQuery, attentionOnly } = navigation;
@@ -106,7 +105,7 @@ export function ClassroomWorkspace({ classes, assignments, students, activeClass
             return <button role="tab" aria-selected={view === item.id} className={view === item.id ? "active" : ""} onClick={() => updateNavigation({ view: item.id })} key={item.id}><Icon size={14} />{item.label}{item.id === "updates" && curriculumUpdateAvailable && updateStatus === "ready" ? <span className="classroom-update-indicator" /> : null}</button>;
           })}
         </div>
-        <button className="classroom-map-action" onClick={onOpenLearningMap}><Network size={14} /> Learning map</button>
+        <button className="classroom-map-action" onClick={onOpenPersonalWorkspace}>Personal workspace <ArrowRight size={14} /></button>
       </header>
 
       <aside className="classroom-sidebar">
