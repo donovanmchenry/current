@@ -20,6 +20,7 @@ import { useMemo, useState } from "react";
 import { defaultClassroomAssignmentId, type ClassroomAssignment, type ClassroomClass, type ClassroomNavigationState, type ClassroomStudent } from "../lib/classroom-catalog";
 import type { LearningPath } from "../lib/learning-path";
 import { CreateAssignmentDialog, CreateClassDialog, type NewAssignmentInput, type NewClassInput } from "./classroom-create-dialogs";
+import { WorkspaceLink } from "./workspace-link";
 
 export type ClassroomUpdateStatus = "ready" | "applied" | "dismissed";
 
@@ -35,7 +36,6 @@ type ClassroomWorkspaceProps = {
   onNavigationChange: (state: ClassroomNavigationState) => void;
   onCreateClass: (input: NewClassInput) => void;
   onCreateAssignment: (input: NewAssignmentInput) => void;
-  onOpenPersonalWorkspace: () => void;
   onPreviewStudent: (student: ClassroomStudent, assignment: ClassroomAssignment, curriculumUpdateApplied: boolean) => void;
   onLaunchStudentSession: (student: ClassroomStudent, assignment: ClassroomAssignment) => void;
   updateStatus: ClassroomUpdateStatus;
@@ -61,7 +61,7 @@ function formatAssignmentDate(value: string) {
   return Number.isNaN(date.getTime()) ? "Unscheduled" : new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
 }
 
-export function ClassroomWorkspace({ classes, assignments, students, activeClass, activeAssignment, assignmentPath, availablePaths, navigation, onNavigationChange, onCreateClass, onCreateAssignment, onOpenPersonalWorkspace, onPreviewStudent, onLaunchStudentSession, updateStatus, onSetUpdateStatus, supportReviewAssigned, onAssignSupportReview }: ClassroomWorkspaceProps) {
+export function ClassroomWorkspace({ classes, assignments, students, activeClass, activeAssignment, assignmentPath, availablePaths, navigation, onNavigationChange, onCreateClass, onCreateAssignment, onPreviewStudent, onLaunchStudentSession, updateStatus, onSetUpdateStatus, supportReviewAssigned, onAssignSupportReview }: ClassroomWorkspaceProps) {
   const [createClassOpen, setCreateClassOpen] = useState(false);
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
   const { view, selectedStudentId, studentQuery, attentionOnly } = navigation;
@@ -105,7 +105,7 @@ export function ClassroomWorkspace({ classes, assignments, students, activeClass
             return <button role="tab" aria-selected={view === item.id} className={view === item.id ? "active" : ""} onClick={() => updateNavigation({ view: item.id })} key={item.id}><Icon size={14} />{item.label}{item.id === "updates" && curriculumUpdateAvailable && updateStatus === "ready" ? <span className="classroom-update-indicator" /> : null}</button>;
           })}
         </div>
-        <button className="classroom-map-action" onClick={onOpenPersonalWorkspace}>Personal workspace <ArrowRight size={14} /></button>
+        <WorkspaceLink className="classroom-map-action" href="/">Personal workspace <ArrowRight size={14} /></WorkspaceLink>
       </header>
 
       <aside className="classroom-sidebar">

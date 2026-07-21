@@ -266,6 +266,7 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   const workspace = await readFile(new URL("../app/current-workspace.tsx", import.meta.url), "utf8");
   const classroomPage = await readFile(new URL("../app/classroom/page.tsx", import.meta.url), "utf8");
   const classroom = await readFile(new URL("../app/classroom-workspace.tsx", import.meta.url), "utf8");
+  const workspaceLink = await readFile(new URL("../app/workspace-link.tsx", import.meta.url), "utf8");
   const dialogs = await readFile(new URL("../app/classroom-create-dialogs.tsx", import.meta.url), "utf8");
   const catalog = await readFile(new URL("../lib/classroom-catalog.ts", import.meta.url), "utf8");
   const map = await readFile(new URL("../app/learning-map.tsx", import.meta.url), "utf8");
@@ -274,17 +275,22 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(workspace, /type WorkspaceView = "lesson" \| "map" \| "classroom"/);
   assert.match(workspace, /CurrentWorkspace\(\{ initialView = "lesson" \}/);
   assert.match(classroomPage, /<CurrentWorkspace initialView="classroom" \/>/);
-  assert.match(workspace, /className="workspace-switch-link" href="\/classroom"/);
+  assert.match(workspace, /WorkspaceLink className="workspace-switch-link" href="\/classroom"/);
   assert.doesNotMatch(workspace, /classroom-sidebar-entry/);
-  assert.match(workspace, /<ClassroomWorkspace[\s\S]*onOpenPersonalWorkspace=\{openPersonalWorkspace\}[\s\S]*onPreviewStudent=\{openClassroomStudent\}[\s\S]*onLaunchStudentSession=\{launchClassroomStudentSession\}[\s\S]*updateStatus=\{classroomUpdateStatus\}/);
+  assert.match(workspace, /<ClassroomWorkspace[\s\S]*onPreviewStudent=\{openClassroomStudent\}[\s\S]*onLaunchStudentSession=\{launchClassroomStudentSession\}[\s\S]*updateStatus=\{classroomUpdateStatus\}/);
   assert.match(workspace, /classroomPathForAssignment\(student, assignment, sourcePath, curriculumUpdateApplied\)[\s\S]*setCustomPaths[\s\S]*setWorkspaceView\("lesson"\)/);
   assert.match(workspace, /const createClassroomClass = \(input: NewClassInput\)/);
   assert.match(workspace, /const createClassroomAssignment = \(input: NewAssignmentInput\)/);
   assert.doesNotMatch(map, /onOpenClassroom|map-classroom-link|>Classroom<\/button>/);
 
   assert.match(classroom, /aria-label="Current Classroom"/);
-  assert.match(classroom, /onOpenPersonalWorkspace: \(\) => void/);
-  assert.match(classroom, /Personal workspace <ArrowRight/);
+  assert.doesNotMatch(classroom, /onOpenPersonalWorkspace|window\.location\.assign/);
+  assert.match(classroom, /WorkspaceLink className="classroom-map-action" href="\/">Personal workspace <ArrowRight/);
+  assert.match(workspaceLink, /router\.prefetch\(href\)/);
+  assert.match(workspaceLink, /dataset\.workspaceTransition = "leaving"/);
+  assert.match(workspaceLink, /router\.push\(href\)/);
+  assert.match(styles, /data-workspace-transition="leaving"[^}]*opacity:\s*0/s);
+  assert.match(styles, /@keyframes workspace-enter/);
   assert.match(classroom, /navigation: ClassroomNavigationState/);
   assert.match(classroom, /onNavigationChange: \(state: ClassroomNavigationState\) => void/);
   assert.match(classroom, /Shared recall gap/);

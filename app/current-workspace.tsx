@@ -73,6 +73,7 @@ import { ClassroomWorkspace, type ClassroomUpdateStatus } from "./classroom-work
 import type { NewAssignmentInput, NewClassInput } from "./classroom-create-dialogs";
 import { LearningMap } from "./learning-map";
 import { SourceArtifactDialog } from "./source-artifact-dialog";
+import { WorkspaceLink } from "./workspace-link";
 
 type Mode = "read" | "recall" | "apply" | "reflect";
 type WorkspaceView = "lesson" | "map" | "classroom";
@@ -588,10 +589,6 @@ export function CurrentWorkspace({ initialView = "lesson" }: CurrentWorkspacePro
     setWorkspaceView("classroom");
   };
 
-  const openPersonalWorkspace = () => {
-    window.location.assign("/");
-  };
-
   const resetLessonActivity = useCallback((nextMode: Mode) => {
     setMode(nextMode);
     setRecallAnswer("");
@@ -960,7 +957,7 @@ export function CurrentWorkspace({ initialView = "lesson" }: CurrentWorkspacePro
             Current
           </span>
           <span className="sidebar-brand-actions">
-            {!isStudentSession && initialView !== "classroom" ? <a className="workspace-switch-link" href="/classroom" aria-label="Open Current Classroom" title="Open Current Classroom"><School size={15} /></a> : null}
+            {!isStudentSession && initialView !== "classroom" ? <WorkspaceLink className="workspace-switch-link" href="/classroom" aria-label="Open Current Classroom" title="Open Current Classroom"><School size={15} /></WorkspaceLink> : null}
             <button className="icon-action mobile-only" onClick={() => setSidebarOpen(false)} aria-label="Close course outline"><X size={17} /></button>
           </span>
         </div>
@@ -1024,7 +1021,6 @@ export function CurrentWorkspace({ initialView = "lesson" }: CurrentWorkspacePro
             onNavigationChange={setClassroomNavigation}
             onCreateClass={createClassroomClass}
             onCreateAssignment={createClassroomAssignment}
-            onOpenPersonalWorkspace={openPersonalWorkspace}
             onPreviewStudent={openClassroomStudent}
             onLaunchStudentSession={launchClassroomStudentSession}
             updateStatus={classroomUpdateStatus}
