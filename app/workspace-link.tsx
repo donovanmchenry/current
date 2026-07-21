@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { type ComponentPropsWithoutRef, type MouseEvent, useEffect, useState } from "react";
 
 type WorkspaceLinkProps = Omit<ComponentPropsWithoutRef<"a">, "href"> & {
@@ -8,24 +7,23 @@ type WorkspaceLinkProps = Omit<ComponentPropsWithoutRef<"a">, "href"> & {
 };
 
 const transitionDuration = 140;
+const transitionStorageKey = "current-workspace-transition";
 
 export function WorkspaceLink({ href, onClick, children, ...props }: WorkspaceLinkProps) {
-  const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
 
   useEffect(() => {
-    router.prefetch(href);
-
     const root = document.documentElement;
-    if (root.dataset.workspaceTransition !== "leaving") return;
+    if (window.sessionStorage.getItem(transitionStorageKey) !== "pending") return;
 
+    window.sessionStorage.removeItem(transitionStorageKey);
     root.dataset.workspaceTransition = "entering";
     const timer = window.setTimeout(() => {
       delete root.dataset.workspaceTransition;
     }, 320);
 
     return () => window.clearTimeout(timer);
-  }, [href, router]);
+  }, []);
 
   const navigate = (event: MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event);
@@ -35,13 +33,14 @@ export function WorkspaceLink({ href, onClick, children, ...props }: WorkspaceLi
     if (isNavigating) return;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      router.push(href);
+      window.location.assign(href);
       return;
     }
 
     setIsNavigating(true);
+    window.sessionStorage.setItem(transitionStorageKey, "pending");
     document.documentElement.dataset.workspaceTransition = "leaving";
-    window.setTimeout(() => router.push(href), transitionDuration);
+    window.setTimeout(() => window.location.assign(href), transitionDuration);
   };
 
   return <a {...props} href={href} aria-busy={isNavigating || undefined} onClick={navigate}>{children}</a>;

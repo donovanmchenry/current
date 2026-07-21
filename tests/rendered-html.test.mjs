@@ -286,9 +286,10 @@ test("connects Current Classroom to the adaptive learner runtime", async () => {
   assert.match(classroom, /aria-label="Current Classroom"/);
   assert.doesNotMatch(classroom, /onOpenPersonalWorkspace|window\.location\.assign/);
   assert.match(classroom, /WorkspaceLink className="classroom-map-action" href="\/">Personal workspace <ArrowRight/);
-  assert.match(workspaceLink, /router\.prefetch\(href\)/);
+  assert.match(workspaceLink, /sessionStorage\.setItem\(transitionStorageKey, "pending"\)/);
+  assert.match(workspaceLink, /sessionStorage\.removeItem\(transitionStorageKey\)/);
   assert.match(workspaceLink, /dataset\.workspaceTransition = "leaving"/);
-  assert.match(workspaceLink, /router\.push\(href\)/);
+  assert.match(workspaceLink, /window\.location\.assign\(href\)/);
   assert.match(styles, /data-workspace-transition="leaving"[^}]*opacity:\s*0/s);
   assert.match(styles, /@keyframes workspace-enter/);
   assert.match(classroom, /navigation: ClassroomNavigationState/);
